@@ -1,12 +1,10 @@
-﻿using NUnit.Framework;
-using System;
-using Unity.Mathematics;
+﻿using System;
 using UnityEngine;
 using System.Collections.Generic;
 
 using Random = UnityEngine.Random;
 
-[System.Serializable]
+
 public class TileData
 {
     public Vector2Int Position; //타일 위치
@@ -24,6 +22,8 @@ public class TileData
 public class Tiling : MonoBehaviour
 {
     public static Tiling Instance; //싱글톤 인스턴스
+    [SerializeField]
+    private FOW fogOfWar;
     private void Awake()
     {
         if (Instance == null)
@@ -51,7 +51,6 @@ public class Tiling : MonoBehaviour
     public TileData[,] TileDataArray; //타일 데이터 배열
 
     public Transform[ , ] Tiles; //타일 배열 x,z
-    [SerializeField]
     public List<Vector2Int> DismovableTiles = new List<Vector2Int>(); //이동 불가능한 타일 리스트
 
 
@@ -67,6 +66,7 @@ public class Tiling : MonoBehaviour
         Tiles = new Transform[xCount, zCount]; //타일 배열 초기화
         TileDataArray = new TileData[xCount, zCount]; //타일 데이터 배열 초기화
         GenerateTile(xCount, zCount); //타일 생성
+        fogOfWar.Init(xCount, zCount);
     }
 
 
@@ -76,7 +76,7 @@ public class Tiling : MonoBehaviour
         {
             for (int j = 0; j < _yCount; j++)
             {
-                Tiles[i, j] = Instantiate<GameObject>(Resources.Load<GameObject>("Tile")).transform;
+                Tiles[i, j] = Instantiate(Resources.Load<GameObject>("Tile")).transform;
                 Tiles[i, j].name = $"Tile{i}_{j}"; //타일 이름 설정
                 TileDataArray[i, j] = new TileData(); //타일 데이터 초기화
                 TileDataArray[i, j].Position = new Vector2Int(i, j); //타일 위치 설정
@@ -102,20 +102,20 @@ public class Tiling : MonoBehaviour
     private void GenerateCharacters()
     {
         Random.InitState((int)DateTime.Now.Ticks); //랜덤 시드 초기화
-        GameObject _chaser = Instantiate<GameObject>(Resources.Load<GameObject>("Chaser"));
+        GameObject _chaser = Instantiate(Resources.Load<GameObject>("Chaser"));
         
         _chaser.GetComponent<CharacterController>().Tiles = Tiles; //타일 배열 설정
-        _chaser.GetComponent<CharacterController>().TileDatas = TileDataArray; //타일 데이터 배열 설정
-        _chaser.GetComponent<CharacterController>().StartPos = new Vector2Int(chaserStartPoint[Random.Range(0, chaserStartPoint.Length)].x, chaserStartPoint[Random.Range(0, chaserStartPoint.Length)].y); //추적자 시작 위치 설정
-        _chaser.transform.position = Tiles[_chaser.GetComponent<CharacterController>().StartPos.x, _chaser.GetComponent<CharacterController>().StartPos.y].position + new Vector3(0, 0.5f, 0); //추적자 위치 설정
+        _chaser.GetComponent<CharacterController>().Astar.TileDataList = TileDataArray; //타일 데이터 배열 설정
+        _chaser.GetComponent<CharacterController>().Astar.StartPos = new Vector2Int(chaserStartPoint[Random.Range(0, chaserStartPoint.Length)].x, chaserStartPoint[Random.Range(0, chaserStartPoint.Length)].y); //추적자 시작 위치 설정
+        _chaser.transform.position = Tiles[_chaser.GetComponent<CharacterController>().Astar.StartPos.x, _chaser.GetComponent<CharacterController>().Astar.StartPos.y].position + new Vector3(0, 0.5f, 0); //추적자 위치 설정
         _chaser.GetComponent<CharacterController>().SetDestination(); //목표 위치 설정
 
 
-        GameObject _runner = Instantiate<GameObject>(Resources.Load<GameObject>("Runner"));
+        GameObject _runner = Instantiate(Resources.Load<GameObject>("Runner"));
         _runner.GetComponent<CharacterController>().Tiles = Tiles; //타일 배열 설정
-        _runner.GetComponent<CharacterController>().TileDatas = TileDataArray; //타일 데이터 배열 설정
-        _runner.GetComponent<CharacterController>().StartPos = new Vector2Int(runnerStartPoint[Random.Range(0, runnerStartPoint.Length)].x, runnerStartPoint[Random.Range(0, runnerStartPoint.Length)].y); //도망자 시작 위치 설정
-        _runner.transform.position = Tiles[_runner.GetComponent<CharacterController>().StartPos.x, _runner.GetComponent<CharacterController>().StartPos.y].position + new Vector3(0, 0.5f, 0); //도망자 위치 설정
+        _runner.GetComponent<CharacterController>().Astar.TileDataList = TileDataArray; //타일 데이터 배열 설정
+        _runner.GetComponent<CharacterController>().Astar.StartPos = new Vector2Int(runnerStartPoint[Random.Range(0, runnerStartPoint.Length)].x, runnerStartPoint[Random.Range(0, runnerStartPoint.Length)].y); //도망자 시작 위치 설정
+        _runner.transform.position = Tiles[_runner.GetComponent<CharacterController>().Astar.StartPos.x, _runner.GetComponent<CharacterController>().Astar.StartPos.y].position + new Vector3(0, 0.5f, 0); //도망자 위치 설정
         _runner.GetComponent<CharacterController>().SetDestination(); //목표 위치 설정
 
     }
