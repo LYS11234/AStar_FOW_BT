@@ -86,7 +86,7 @@ public class Tiling : MonoBehaviour
                 Tiles[i, j].localScale = new Vector3(tileWidth, 1, tileHeight); //타일 크기 설정
                 Tiles[i, j].parent = transform; //타일 부모 설정
                 Tiles[i, j].gameObject.layer = 7;
-                                                                                        //레이캐스트로 장애물 찾기
+                                                                              //레이캐스트로 장애물 찾기
 
                 if (Physics.Raycast(Tiles[i, j].position - new Vector3(0,10,0) , Vector3.up, out RaycastHit hit, 100f,1 << 6))
                 {
@@ -104,19 +104,22 @@ public class Tiling : MonoBehaviour
         Random.InitState((int)DateTime.Now.Ticks); //랜덤 시드 초기화
         GameObject _chaser = Instantiate(Resources.Load<GameObject>("Chaser"));
         
-        _chaser.GetComponent<CharacterController>().Tiles = Tiles; //타일 배열 설정
-        _chaser.GetComponent<CharacterController>().Astar.TileDataList = TileDataArray; //타일 데이터 배열 설정
-        _chaser.GetComponent<CharacterController>().Astar.StartPos = new Vector2Int(chaserStartPoint[Random.Range(0, chaserStartPoint.Length)].x, chaserStartPoint[Random.Range(0, chaserStartPoint.Length)].y); //추적자 시작 위치 설정
-        _chaser.transform.position = Tiles[_chaser.GetComponent<CharacterController>().Astar.StartPos.x, _chaser.GetComponent<CharacterController>().Astar.StartPos.y].position + new Vector3(0, 0.5f, 0); //추적자 위치 설정
-        _chaser.GetComponent<CharacterController>().SetDestination(); //목표 위치 설정
+        _chaser.GetComponent<ChaserController>().Tiles = Tiles; //타일 배열 설정
+        _chaser.GetComponent<ChaserController>().Astar.TileDataList = TileDataArray; //타일 데이터 배열 설정
+        _chaser.GetComponent<ChaserController>().Astar.StartPos = new Vector2Int(chaserStartPoint[Random.Range(0, chaserStartPoint.Length)].x, chaserStartPoint[Random.Range(0, chaserStartPoint.Length)].y); //추적자 시작 위치 설정
+        _chaser.transform.position = Tiles[_chaser.GetComponent<ChaserController>().Astar.StartPos.x, _chaser.GetComponent<CharacterController>().Astar.StartPos.y].position + new Vector3(0, 0.5f, 0); //추적자 위치 설정
+        
 
 
         GameObject _runner = Instantiate(Resources.Load<GameObject>("Runner"));
-        _runner.GetComponent<CharacterController>().Tiles = Tiles; //타일 배열 설정
-        _runner.GetComponent<CharacterController>().Astar.TileDataList = TileDataArray; //타일 데이터 배열 설정
-        _runner.GetComponent<CharacterController>().Astar.StartPos = new Vector2Int(runnerStartPoint[Random.Range(0, runnerStartPoint.Length)].x, runnerStartPoint[Random.Range(0, runnerStartPoint.Length)].y); //도망자 시작 위치 설정
-        _runner.transform.position = Tiles[_runner.GetComponent<CharacterController>().Astar.StartPos.x, _runner.GetComponent<CharacterController>().Astar.StartPos.y].position + new Vector3(0, 0.5f, 0); //도망자 위치 설정
-        _runner.GetComponent<CharacterController>().SetDestination(); //목표 위치 설정
-
+        _runner.GetComponent<RunnerController>().Tiles = Tiles; //타일 배열 설정
+        _runner.GetComponent<RunnerController>().Astar.TileDataList = TileDataArray; //타일 데이터 배열 설정
+        _runner.GetComponent<RunnerController>().Astar.StartPos = new Vector2Int(runnerStartPoint[Random.Range(0, runnerStartPoint.Length)].x, runnerStartPoint[Random.Range(0, runnerStartPoint.Length)].y); //도망자 시작 위치 설정
+        _runner.transform.position = Tiles[_runner.GetComponent<RunnerController>().Astar.StartPos.x, _runner.GetComponent<CharacterController>().Astar.StartPos.y].position + new Vector3(0, 0.5f, 0); //도망자 위치 설정
+        _runner.GetComponent<RunnerController>().Init(_chaser.GetComponent<ChaserController>()); //목표 위치 설정
+        _chaser.GetComponent<ChaserController>().Init(_runner.GetComponent<RunnerController>()); //목표 위치 설정
+        FOW.Instance.Characters[0] = _chaser.GetComponent<CharacterController>();
+        FOW.Instance.Characters[1] = _runner.GetComponent<CharacterController>();
+        
     }
 }

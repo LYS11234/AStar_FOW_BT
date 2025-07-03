@@ -48,14 +48,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 35dbabf1adb1f634f8c1c3a3733404e1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  openList: []
-  closedList: []
-  path: []
-  currentOpenList: []
-  destination: {x: 0, y: 0}
-  StartPos: {x: 0, y: 0}
-  IsStart: 0
   movementCount: 0
+  sightDistance: 4
+  status: 0
+  target: {fileID: 0}
 --- !u!33 &6324514492110511704
 MeshFilter:
   m_ObjectHideFlags: 0
