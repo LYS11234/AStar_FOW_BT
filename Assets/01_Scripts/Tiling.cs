@@ -116,7 +116,7 @@ public class Tiling : MonoBehaviour
         _runner.GetComponent<RunnerController>().Astar.TileDataList = TileDataArray; //타일 데이터 배열 설정
         _runner.GetComponent<RunnerController>().Astar.StartPos = new Vector2Int(runnerStartPoint[Random.Range(0, runnerStartPoint.Length)].x, runnerStartPoint[Random.Range(0, runnerStartPoint.Length)].y); //도망자 시작 위치 설정
         _runner.transform.position = Tiles[_runner.GetComponent<RunnerController>().Astar.StartPos.x, _runner.GetComponent<CharacterController>().Astar.StartPos.y].position + new Vector3(0, 0.5f, 0); //도망자 위치 설정
-        _runner.GetComponent<RunnerController>().Init(_chaser.GetComponent<ChaserController>()); //목표 위치 설정
+        _runner.GetComponent<RunnerController>().Init(_chaser.GetComponent<ChaserController>(), FOW.Instance.viewAngle); //목표 위치 설정
         _chaser.GetComponent<ChaserController>().Init(_runner.GetComponent<RunnerController>()); //목표 위치 설정
         FOW.Instance.Characters[0] = _chaser.GetComponent<CharacterController>();
         FOW.Instance.Characters[1] = _runner.GetComponent<CharacterController>();

@@ -32,13 +32,13 @@ public class FOW : MonoBehaviour
             Destroy(gameObject);
         }
     }
-    
+
     private FogOfWarStatus[,] fogOfWarStatuses = new FogOfWarStatus[0, 0];
     private Texture2D fogTexture;
-    public Material fogMaterial; 
+    public Material fogMaterial;
     public int tileWidthCount;
     public int tileHeightCount;
-    
+
     private const int VisibleLayer = 8;
     private const int InvisibleLayer = 9;
 
@@ -47,20 +47,20 @@ public class FOW : MonoBehaviour
     [SerializeField]
     private Transform[] characterTf = new Transform[2];
 
-    [SerializeField] private float viewAngle;
+    public float viewAngle;
     private float viewRad;
     [SerializeField] private TMP_Dropdown dropdown;
     private byte nowPlayer;
     private bool isStart;
-    
+
     public void Init(int _tileWidthCount, int _tileHeightCount)
     {
         tileWidthCount = _tileWidthCount;
         tileHeightCount = _tileHeightCount;
         CreateFogTexture();
-        
+
         fogOfWarStatuses = new FogOfWarStatus[tileWidthCount, tileHeightCount];
-        
+
         for (var i = 0; i < tileHeightCount; i++)
         {
             for (var j = 0; j < tileWidthCount; j++)
@@ -76,6 +76,7 @@ public class FOW : MonoBehaviour
         viewRad = viewAngle * Mathf.Deg2Rad;
         UpdateFogTexture();
         isStart = true;
+        OnValueChange();
     }
 
     private void LateUpdate()
@@ -91,43 +92,43 @@ public class FOW : MonoBehaviour
         }
         ShowFOWView();
     }
-    
-    
+
+
 
     private void ShowFOWView()
     {
-        
+
         switch (nowPlayer)
         {
             case 2:
-            {
-                ShowAllUnitView();
-                return;
-            }
-            default:
-            {
-                int sightRadius = 0;
-                Vector2Int position = new Vector2Int(0, 0);
-                sightRadius = Characters[nowPlayer].GetSightDistance();
-                short count = 0;
-                if (Characters[nowPlayer].GetMovementCount() > 0)
                 {
-                    count = (short)(Characters[nowPlayer].GetMovementCount() - 1);
+                    ShowAllUnitView();
+                    return;
                 }
+            default:
+                {
+                    int sightRadius = 0;
+                    Vector2Int position = new Vector2Int(0, 0);
+                    sightRadius = Characters[nowPlayer].GetSightDistance();
+                    short count = 0;
+                    if (Characters[nowPlayer].GetMovementCount() > 0)
+                    {
+                        count = (short)(Characters[nowPlayer].GetMovementCount() - 1);
+                    }
 
-                position = Characters[nowPlayer].Astar.Path[Characters[nowPlayer].GetMovementCount()].Position;
-                UpdateFogOfWarStatus(position, sightRadius);
-                break;
-            }
+                    position = Characters[nowPlayer].Astar.CurrentNode.Position;
+                    UpdateFogOfWarStatus(position, sightRadius);
+                    break;
+                }
         }
-        
+
     }
     private void CreateFogTexture()
     {
         fogTexture = new Texture2D(tileWidthCount, tileHeightCount, TextureFormat.Alpha8, false);
         fogTexture.filterMode = FilterMode.Point;
         fogTexture.wrapMode = TextureWrapMode.Clamp;
-        
+
         Color32[] initialColors = new Color32[tileWidthCount * tileHeightCount];
         for (int i = 0; i < initialColors.Length; i++)
         {
@@ -143,7 +144,7 @@ public class FOW : MonoBehaviour
 
         }
     }
-    
+
     private void UpdateFogTexture()
     {
         Color32[] colors = new Color32[tileWidthCount * tileHeightCount];
@@ -152,7 +153,7 @@ public class FOW : MonoBehaviour
             for (int x = 0; x < tileWidthCount; x++)
             {
                 int index = y * tileWidthCount + x; // 1D 인덱스로 변환
-                if(nowPlayer != 2)
+                if (nowPlayer != 2)
                 {
                     if (fogOfWarStatuses[x, y].viewType != nowPlayer + 1 && fogOfWarStatuses[x, y].viewType != 3)
                     {
@@ -165,24 +166,24 @@ public class FOW : MonoBehaviour
                 {
 
                     case FogOfWarViewStatus.Visited:
-                    {
-                        colors[index] = new Color32(0, 0, 0, 254); // 검은색, 반투명 (회색 느낌)
+                        {
+                            colors[index] = new Color32(0, 0, 0, 254); // 검은색, 반투명 (회색 느낌)
 
-                        break;
-                    }
+                            break;
+                        }
 
                     case FogOfWarViewStatus.Visible:
-                    {
-                        colors[index] = new Color32(0, 0, 0, 0); // 완전 투명
+                        {
+                            colors[index] = new Color32(0, 0, 0, 0); // 완전 투명
 
-                        break;
-                    }
+                            break;
+                        }
 
                     default:
-                    {
-                        colors[index] = new Color32(0, 0, 0, 255); // 검은색, 완전 불투명
-                        break;
-                    }
+                        {
+                            colors[index] = new Color32(0, 0, 0, 255); // 검은색, 완전 불투명
+                            break;
+                        }
                 }
             }
         }
@@ -207,7 +208,7 @@ public class FOW : MonoBehaviour
         if (Characters[1 - nowPlayer].Astar.Path.Count > 0 && Characters[nowPlayer].Astar.Path.Count > 0)
         {
             ShowUnitView(position, sightRadius, (byte)(nowPlayer + 1));
-            ShowUnitView(Characters[1 - nowPlayer].Astar.Path[Characters[1 - nowPlayer].GetMovementCount()].Position, sightRadius, (byte)(2 - nowPlayer));
+            ShowUnitView(Characters[1 - nowPlayer].Astar.CurrentNode.Position, sightRadius, (byte)(2 - nowPlayer));
         }
         UpdateFogTexture();
     }
@@ -229,21 +230,15 @@ public class FOW : MonoBehaviour
 
         for (int i = 0; i < Characters.Length; i++)
         {
-            short count = 0;
 
 
-            if (Characters[i].GetMovementCount() > 0)
-            {
-                count = (short)(Characters[i].GetMovementCount() - 1);
-            }
-
-            Vector2Int position = Characters[i].Astar.Path[count].Position;
+            Vector2Int position = Characters[i].Astar.CurrentNode.Position;
             int sightRadius = Characters[i].GetSightDistance();
             ShowUnitView(position, sightRadius, (byte)(i + 1));
         }
 
         UpdateFogTexture();
-        
+
     }
 
     private void ShowUnitView(Vector2Int position, int sightRadius, byte playerNum)
@@ -307,24 +302,24 @@ public class FOW : MonoBehaviour
     {
         Vector3 startWorldPos = GetWorldPositionFromTile(startTile) + Vector3.up * 0.5f; // 눈높이
         Vector3 endWorldPos = GetWorldPositionFromTile(endTile) + Vector3.up * 0.5f; // 타일 중심 약간 위
-        
+
         Vector3 direction = endWorldPos - startWorldPos;
         direction.Normalize();
-        
-        float dotProduct = Vector3.Dot(nowCharacterTf.forward,direction);
+
+        float dotProduct = Vector3.Dot(nowCharacterTf.forward, direction);
         float minDotProduct = Mathf.Cos(viewAngle * 0.5f * Mathf.Deg2Rad);
         if (dotProduct < minDotProduct)
         {
             return false;
         }
 
-        
+
         RaycastHit hit;
         if (Physics.Linecast(startWorldPos, endWorldPos, out hit, LayerMask.GetMask("Wall")))
         {
-            return false; 
+            return false;
         }
-        return true; 
+        return true;
     }
 
 
@@ -390,24 +385,24 @@ public class FOW : MonoBehaviour
         if (nowPlayer >= 2)
         {
             Characters[0].gameObject.layer = VisibleLayer;
-            Characters[1].gameObject.layer = VisibleLayer;;
+            Characters[1].gameObject.layer = VisibleLayer; ;
             return;
         }
         Characters[nowPlayer].gameObject.layer = VisibleLayer;
         Characters[1 - nowPlayer].gameObject.layer = InvisibleLayer;
-        
+
     }
-    
+
     private void CheckDistance()
     {
         if (nowPlayer >= 2)
         {
             return;
         }
-        Vector2Int position = Characters[1 - nowPlayer].Astar.Path[Characters[1 - nowPlayer].GetMovementCount()].Position;
+        Vector2Int position = Characters[1 - nowPlayer].Astar.CurrentNode.Position;
         if (fogOfWarStatuses[position.x, position.y].status != FogOfWarViewStatus.Visible)
         {
-            Characters[1 - nowPlayer].gameObject.layer = InvisibleLayer;;
+            Characters[1 - nowPlayer].gameObject.layer = InvisibleLayer; ;
         }
         else
         {
@@ -415,3 +410,5 @@ public class FOW : MonoBehaviour
         }
     }
 }
+
+

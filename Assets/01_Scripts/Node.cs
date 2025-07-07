@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using NUnit.Framework.Constraints;
+using System.Collections.Generic;
 using System.Linq;
 using Unity.VisualScripting;
 using UnityEngine;
@@ -96,7 +97,11 @@ public class Selector : Node
 
         public override NodeState Evaluate()
         {
-            if (Vector2Int.Distance(self.Astar.CurrentNode.Position, player.Astar.CurrentNode.Position) <= sightRange && player.gameObject.layer == 8)
+            if (!self.GetInSight())
+            {
+                return NodeState.Failure; // 시야 내에 플레이어가 없으면 실패 반환
+            }// 시야 내의 타일을 업데이트
+            if (Vector2Int.Distance(self.Astar.CurrentNode.Position, player.Astar.CurrentNode.Position) <= sightRange)
             {
                 Debug.Log("플레이어 발견!"); // 여기서 반복됨.
                 return NodeState.Success;
@@ -123,35 +128,32 @@ public class Selector : Node
         public override NodeState Evaluate()
         {
 
-            // 플레이어가 시야에 있고, 레이어가 8일 때
-            if (Vector2Int.Distance(self.Astar.CurrentNode.Position, player.Astar.CurrentNode.Position) <= sightRange && player.gameObject.layer == 8)
+            // 플레이어가 시야에 있고
+            // 만약 추적 상태가 아니었다면, 상태를 변경하고 추적 시작
+            if (!self.GetState())
             {
-                // 만약 추적 상태가 아니었다면, 상태를 변경하고 추적 시작
-                if (!isChasing)
-                {
-                    self.SetStatus(); // CharacterStatus를 Moving으로 설정
-                    isChasing = true; // 추적 상태로 변경
-                }
-                chaseAction(); // Chase() 메서드 호출 (경로 계산 및 이동)
-
-                // 만약 Chase() 결과 경로를 못찾았다면 추적 실패
-                if (self.Astar.Path.Count == 0)
-                {
-                    isChasing = false; // 추적 상태 해제
-                    return NodeState.Failure; // 실패 반환하여 다른 행동(순찰)을 하도록 유도
-                }
-                return NodeState.Running; // 추적이 계속 진행 중
+                self.SetStatus(); // CharacterStatus를 Moving으로 설정
             }
+            chaseAction(); // Chase() 메서드 호출 (경로 계산 및 이동)
+
+            // 만약 Chase() 결과 경로를 못찾았다면 추적 실패
+            if (self.Astar.Path.Count == 0)
+            {
+                if (self.GetState())
+                {
+                    self.EndChase(); // EndChase() 메서드 호출 (목적지 설정)
+                    isChasing = false; // 추적 상태 해제
+                }
+                return NodeState.Failure; // 실패 반환하여 다른 행동(순찰)을 하도록 유도
+            }
+            return NodeState.Running; // 추적이 계속 진행 중
 
             // 플레이어가 시야에 없으면 추적 종료
-            if (isChasing)
-            {
-                isChasing = false; // 추적 상태 해제
-            }
+
             return NodeState.Success; // Success를 반환하여 다음 프레임에 PatrolNode가 자연스럽게 실행되도록 함
+
         }
     }
-    
     public class RunAwayNode : Node
     {
         
@@ -159,32 +161,33 @@ public class Selector : Node
         private readonly RunnerController self;
         private readonly ChaserController player;
         private Action runAction;
-        private readonly int runDistance;
-        public RunAwayNode(RunnerController self, ChaserController player, int runDistance, Action action)
+
+        public RunAwayNode(RunnerController self, ChaserController player, Action action)
         {
             this.self = self;
             this.player = player;
-            this.runDistance = runDistance;
             runAction = action;
         }
         public override NodeState Evaluate()
         {
-            
-
-            long distance = self.Astar.Path.Count;
-
-            if(distance < runDistance)
+            // 'isRunning' 플래그가 켜져 있을 때만 이 노드가 작동하도록 변경
+            if (self.IsRunning())
             {
-                runAction(); // 도망치는 행동 실행
-                return NodeState.Running;
+                if (self.GetCurrentRunTime() > 0f)
+                {
+                    runAction(); // 도망치는 행동 실행
+                    return NodeState.Running;
+                }
+                else // 도망 시간이 끝나면
+                {
+                    self.ResetRun();
+                    Debug.Log("도주 종료");
+                    return NodeState.Success;
+                }
             }
 
-            if(distance >= runDistance)
-            {
-                self.ResetRun();
-                return NodeState.Success; // 충분히 도망쳤다면 성공
-            }
-            return NodeState.Failure; // 도망칠 수 없음
+            // 도망치는 상태가 아니면 이 노드는 관여하지 않음
+            return NodeState.Failure;
         }
     }
     
@@ -209,6 +212,22 @@ public class Selector : Node
             }
             move(); // 현재 목적지로 이동
             return NodeState.Running; 
+        }
+    }
+
+    public class ActionNode : Node
+    {
+        private readonly Action action;
+
+        public ActionNode(Action action)
+        {
+            this.action = action;
+        }
+
+        public override NodeState Evaluate()
+        {
+            action();
+            return NodeState.Success;
         }
     }
 

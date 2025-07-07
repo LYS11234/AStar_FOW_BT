@@ -4,6 +4,7 @@ using System;
 using System.Linq;
 
 using Random = UnityEngine.Random;
+using static UnityEngine.GraphicsBuffer;
 
 
 
@@ -147,13 +148,15 @@ public class CharacterController : MonoBehaviour
     public Transform[,] Tiles; //타일 배열
     [SerializeField]
     protected int sightDistance = 5;
-
+    protected float viewAngle; //시야각
     private FOW fogOfWar;
     private Vector3 destination;
     [SerializeField]
     protected CharacterStatus status;
-    private Vector3 targetPos;
-
+    [SerializeField]
+    protected Vector3 targetPos;
+    [SerializeField]
+    protected bool isInSight;
     private bool isMoving;
     #endregion
 
@@ -174,19 +177,6 @@ public class CharacterController : MonoBehaviour
         {
             return;
         }
-        //if (status == CharacterStatus.FindingPath)
-        //{
-        //    SetDestination();   
-        //}
-        //if (status == CharacterStatus.Moving)
-        //{
-        //    MoveFront();
-        //}
-
-        //if (status == CharacterStatus.Turning)
-        //{
-        //    Turn();
-        //}
 
         rootNode.Evaluate();
     }
@@ -195,7 +185,8 @@ public class CharacterController : MonoBehaviour
 
     protected void SetDestination()
     {
-        Debug.Log($"{name} Destination set to: {Astar.Destination}");
+        
+        
         Random.InitState((int)DateTime.Now.Ticks); //랜덤 시드 초기화
         movementCount = 0; //이동 카운트 초기화
         Astar.Destination = new Vector2Int(Random.Range(0, Tiling.Instance.Tiles.GetLength(0) - 1), Random.Range(0, Tiling.Instance.Tiles.GetLength(1) - 1));
@@ -239,7 +230,11 @@ public class CharacterController : MonoBehaviour
         }
     }
 
+    public virtual void HasLineOfSight()
+    {
+        
 
+    }
     public CharacterStatus GetStatus()
     {
         return status;
@@ -254,26 +249,31 @@ public class CharacterController : MonoBehaviour
         }
 
 
-        
-        //if (Vector3.Distance(transform.position, destination) <= 0.01f || movementCount >= Astar.Path.Count - 1)
-        //{
-        //    Astar.StartPos = Astar.Path.Last().Position; //시작 위치 업데이트
-        //    status = CharacterStatus.FindingPath;
-        //    return; //목표 위치에 도달하면 새로운 목표 설정
-        //}
+
+        if (Vector3.Distance(transform.position, destination) <= 0.01f || movementCount >= Astar.Path.Count - 1)
+        {
+            Astar.StartPos = Astar.Path.Last().Position; //시작 위치 업데이트
+            Astar.Path.Clear(); //경로 리스트 초기화
+            return; //목표 위치에 도달하면 새로운 목표 설정
+        }
         if (Vector3.Angle(transform.forward, targetPos - transform.position) > 0.1f)
         {
             status = CharacterStatus.Turning;
+            //return;
         }
 
         if (Vector3.Distance(transform.position, targetPos) <= 0.1f)
         {
             transform.position = targetPos;
-            Astar.CurrentNode = Astar.Path[movementCount]; //현재 노드 업데이트
-            SetTargetPos();
+            if (movementCount >= 1 && movementCount < Astar.Path.Count)
+            {
+                Astar.CurrentNode = Astar.Path[movementCount - 1]; //현재 노드 업데이트
+            }
+            
+
+
             movementCount++;
-
-
+            SetTargetPos();
             isMoving = false;
             return;
         }
@@ -287,25 +287,46 @@ public class CharacterController : MonoBehaviour
 
     private void SetTargetPos()
     {
-        targetPos = Tiles[Astar.Path[movementCount].Position.x, Astar.Path[movementCount].Position.y].position +
+        if(movementCount < Astar.Path.Count)
+        {
+            
+            targetPos = Tiles[Astar.Path[movementCount].Position.x, Astar.Path[movementCount].Position.y].position +
                     new Vector3(0, 0.5f, 0);
-        Astar.CurrentNode = Astar.Path[movementCount]; //현재 노드 업데이트
+            if (movementCount >= 1)
+            {
+                Astar.CurrentNode = Astar.Path[movementCount - 1]; //현재 노드 업데이트
+            }
+        }
+        
+        
+        
     }
 
-    private void Turn()
+    protected void TurnTowards(Vector3 targetDirection)
     {
+        // y축은 무시하여 수평 회전만 하도록 보장
+        targetDirection.y = 0;
+
+        if (Vector3.Angle(transform.forward, targetDirection) > 0.1f && targetDirection != Vector3.zero)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(targetDirection);
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, 360f * Time.deltaTime);
+        }
+        else // 회전이 완료되면 이동 상태로 변경
+        {
+            status = CharacterStatus.Moving;
+        }
+    }
+
+    // ✨ 기존 Turn() 메소드는 내부 로직을 수정
+    protected void Turn()
+    {
+        // 순찰 시에는 스스로 목적지를 설정하고
         SetTargetPos();
         Vector3 directionToTarget = targetPos - transform.position;
-        directionToTarget.y = 0;
 
-        if (Vector3.Angle(transform.forward, directionToTarget) > 0.1f && directionToTarget != Vector3.zero)
-        {
-            Quaternion targetRotation = Quaternion.LookRotation(directionToTarget);
-
-            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, 360f * Time.deltaTime);
-            return;
-        }
-        status = CharacterStatus.Moving;
+        // 새로 만든 TurnTowards를 호출하여 회전 실행
+        TurnTowards(directionToTarget);
     }
 
     public int GetMovementCount()
@@ -321,5 +342,9 @@ public class CharacterController : MonoBehaviour
     public bool IsMoving()
     {
         return isMoving;
+    }
+    public bool GetInSight()
+    {
+        return isInSight;
     }
 }

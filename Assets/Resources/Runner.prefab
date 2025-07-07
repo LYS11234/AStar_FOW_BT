@@ -125,6 +125,10 @@ MonoBehaviour:
   movementCount: 0
   sightDistance: 4
   status: 0
+  firstRunTurn: 0
+  isRunning: 0
+  isInitialTurnStarted: 0
+  runTime: 5
   target: {fileID: 0}
 --- !u!54 &2447871280707816977
 Rigidbody:

@@ -4,70 +4,85 @@ using System.Collections;
 
 
 using static Selector;
+using UnityEditor.Experimental.GraphView;
 
-public class RunnerController : CharacterController
+public class RunnerController : CharacterController // 도주하는 방식에 오류가 있음. 확인할 것.
 {
     [SerializeField]
     private RaycastHit hit;
     private RaycastHit hitBottom;
     protected float runSightDistance;
-    private bool coroutinRun;
+    [SerializeField]
     private bool firstRunTurn = false;
     [SerializeField]
+    private bool isRunning = false; // 도주 상태를 나타내는 변수
+    [SerializeField]
+    private bool isInitialTurnStarted = false; // 첫 도주 회전이 시작되었는지 여부
+
+    [SerializeField]
+    private float runTime = 20f; // 도주 시간
+    [SerializeField]
     protected ChaserController target; //타겟 캐릭터
-    public  void Init(ChaserController _target)
+
+    Vector3 direction = Vector3.zero;
+
+    public bool IsRunning() { return isRunning; }
+
+
+    public void Init(ChaserController _target, float viewAngle)
     {
         target = _target;
         runSightDistance = 1.5f;
-        // 행동 트리 구성
+        this.viewAngle = viewAngle;
         rootNode = new Selector(new List<Node>
         {
-            // 도주 시퀀스
+            new RunAwayNode(this, target, Run),
+
             new Sequence(new List<Node>
             {
                 new CheckPlayerInSightNode(this, target, sightDistance),
-                new RunAwayNode(this, target, sightDistance, Run)
+                new ActionNode(() => { isRunning = true; Run(); })
             }),
-            // 기본 행동: 순찰
+
             new PatrolNode(this, Move, SetDestination)
         });
+        Astar.CurrentNode = Astar.TileDataList[Astar.StartPos.x, Astar.StartPos.y];
         SetDestination();
     }
 
     protected override void Update()
     {
         base.Update();
-        Debug.DrawRay(transform.position, transform.forward * runSightDistance, Color.red); // 레이캐스트 시각화
+        if (isRunning)
+        {
+            RunTimeCheck(); // 도주 시간 체크
+        }
     }
     private void Run()
     {
-        Astar.Destination = target.Astar.CurrentNode.Position; //타겟의 현재 노드 위치를 도착지로 설정
+        isRunning = true;
 
-        Physics.Raycast(transform.position, -transform.up, out hitBottom, 10f);
-        Vector2Int currentPosition = Astar.CurrentNode.Position;
-        for (int i = 0; i < Astar.TileDataList.GetLength(0); i++)
-        {
-            for (int j = 0; j < Astar.TileDataList.GetLength(1); j++)
-            {
-                if (Tiles[i,j] == hitBottom.transform)
-                {
-                    currentPosition = new Vector2Int(i, j);
-                    break;
-                }
-            }
-        }
-        ResetPath();
-        
         if (!firstRunTurn)
         {
-            StartCoroutine(RunTurnFirst());
-        }
-        if (Physics.Raycast(transform.position, transform.forward, out hit, runSightDistance, 6))
-        {
-            StartCoroutine(RunTurn());
+            if (!firstRunTurn) // 이전에 추가했던 코루틴 가드 로직
+            {
+                status = CharacterStatus.Turning;
+                StartRunningTurn(); // 첫 도주 회전 시작
+            }
             return;
         }
-        RunFront();
+
+        if (status == CharacterStatus.Turning)
+        {
+            targetPos = transform.position + direction * 10f;
+            base.TurnTowards(targetPos);
+            return;
+        }
+        if (status == CharacterStatus.Moving)
+        {
+            RunFront();
+            return;
+        }
     }
 
     public void ResetPath()
@@ -97,55 +112,123 @@ public class RunnerController : CharacterController
         Astar.AStarAlgorithm(); //A* 알고리즘 실행
     }
 
+ 
+
+
     private void RunFront()
     {
+        if (Physics.Raycast(transform.position, transform.forward, out hit, runSightDistance, 1 << 6))
+        {
+
+            float distanceL = float.MaxValue;
+            float distanceR = float.MaxValue;
+            if (Physics.Raycast(transform.position, -transform.right, out hit, 10, 1 << 6))
+            {
+                distanceL = hit.distance;
+            }
+            if (Physics.Raycast(transform.position, transform.right, out hit, 10, 1 << 6))
+            {
+                distanceR = hit.distance;
+            }
+            this.direction = (distanceL > distanceR) ? -transform.right : transform.right;
+
+            status = CharacterStatus.Turning;
+            return;
+        }
+
         transform.position = Vector3.MoveTowards(transform.position, transform.position + transform.forward, 2f * Time.deltaTime);
+
+        Transform currentTransform = Physics.Raycast(transform.position, -transform.up, out hitBottom, 10f) ? hitBottom.transform : null;
+        Vector2Int currentPosition = Astar.CurrentNode.Position;
+        for (int i = 0; i < Astar.TileDataList.GetLength(0); i++)
+        {
+            for (int j = 0; j < Astar.TileDataList.GetLength(1); j++)
+            {
+                if (Tiles[i, j] == currentTransform)
+                {
+                    currentPosition = new Vector2Int(i, j);
+                    break;
+                }
+            }
+        }
+        Astar.CurrentNode = Astar.TileDataList[currentPosition.x, currentPosition.y];
+
+        if (runTime <= 0f)
+        {
+            Debug.Log("도주 시간 종료");
+            ResetRun();
+            return;
+        }
         firstRunTurn = true;
     }
 
-    private IEnumerator RunTurn()
+
+    public override void HasLineOfSight()
     {
-        if(coroutinRun)
-            yield break;
-        coroutinRun = true;
-        float distanceL = float.MaxValue;
-        float distanceR = float.MaxValue;
-        if (Physics.Raycast(transform.position, -transform.right, out hit, 10, 6))
-        {
-            distanceL = hit.distance;
-        }
-        if (Physics.Raycast(transform.position, transform.right, out hit, 10, 6))
-        {
-            distanceR = hit.distance;
-        }
-        Vector3 direction = distanceR > distanceL ? transform.right : -transform.right;
+        base.HasLineOfSight();
+        Vector3 startWorldPos = transform.position;
+        Vector3 targetPos = target.transform.position;
+        Vector3 targetDirection = (targetPos - startWorldPos).normalized;
+        Vector3 direction = transform.forward;
 
-        while (Vector3.Angle(transform.forward, direction) > 0.1f)
+        float dotProduct = Vector3.Dot(direction, targetDirection);
+        float minDotProduct = Mathf.Cos(viewAngle * 0.5f * Mathf.Deg2Rad);
+        if (dotProduct < minDotProduct)
         {
-            Quaternion targetRotation = Quaternion.LookRotation(direction);
-
-            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, 360f * Time.deltaTime);
-            yield return null;
+            isInSight = false; // 시야 밖
         }
-        coroutinRun = false;
+
+
+        RaycastHit hit;
+        if (Physics.Linecast(startWorldPos, targetPos, out hit, LayerMask.GetMask("Wall")))
+        {
+            isInSight = false; // 벽에 가려져 있으면 시야 밖
+            return;
+        }
+        isInSight = true; // 벽에 가려지지 않으면 시야 안
     }
 
-    private IEnumerator RunTurnFirst()
+    private void StartRunningTurn()
     {
-        while (Vector3.Angle(transform.forward, -transform.forward) > 0.1f)
+        if (!isInitialTurnStarted)
         {
-            Quaternion targetRotation = Quaternion.LookRotation(-transform.forward);
-
-            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, 360f * Time.deltaTime);
-            yield return null;
+            direction = -transform.forward;
+            isInitialTurnStarted = true; 
         }
-        firstRunTurn = true;
-    }    
+        if (runTime <= 0f)
+        {
+            Debug.Log("도주 시간 종료");
+            ResetRun();
+            return; 
+        }
+        if (Vector3.Angle(transform.forward, direction) <= 0.1f)
+        {
+            firstRunTurn = true;
+            status = CharacterStatus.Moving; 
+            Debug.Log("도주 회전 완료"); 
+            return;
+        }
+        Quaternion targetRotation = Quaternion.LookRotation(direction);
+        transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, 360f * Time.deltaTime);        
+    }
 
     public void ResetRun()
     {
+        Debug.Log("도주 초기화");
         firstRunTurn = false;
-        coroutinRun = false;
+        isRunning = false; // 도주 상태 초기화
+        runTime = 20f; // 도주 시간 초기화
+        ResetPath(); // A* 경로 초기화
+    }
+    public void RunTimeCheck()
+    {
+        runTime -= Time.deltaTime;
+    }
+
+    public float GetCurrentRunTime()
+    {
+        return runTime;
     }
 }
+
  

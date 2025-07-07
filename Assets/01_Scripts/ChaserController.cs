@@ -3,13 +3,15 @@ using Unity.VisualScripting;
 using UnityEngine;
 using static Selector;
 
-public class ChaserController : CharacterController
+public class ChaserController : CharacterController //추격 그만두는 경우와 추격 위치 추측 알고리즘 추가할 것
 {
     [SerializeField]
     private RaycastHit hit;
     private RaycastHit hitBottom;
     [SerializeField]
     protected RunnerController target; //타겟 캐릭터
+    [SerializeField]
+    private bool isChasing = false; // 추적 상태를 나타내는 변수
 
     protected override void Update()
     {
@@ -32,6 +34,7 @@ public class ChaserController : CharacterController
             // 기본 행동: 순찰
            new PatrolNode(this, Move, SetDestination)
         });
+        Astar.CurrentNode = Astar.TileDataList[Astar.StartPos.x, Astar.StartPos.y]; // 현재 타일 설정
         SetDestination();
     }
 
@@ -39,9 +42,34 @@ public class ChaserController : CharacterController
     {
         if (target == null)
         {
+            isChasing = false; // 타겟이 없으면 추적 상태 해제
             return; //타겟이 없으면 종료
         }
-        Astar.Destination = target.Astar.CurrentNode.Position; //타겟의 현재 노드 위치를 도착지로 설정
+        if(!isChasing)
+        {
+            AStarCount(); // A* 알고리즘을 사용하여 경로 계산
+            isChasing = true; // 추적 상태로 변경
+        }
+        
+        Move();
+        if(Astar.CurrentNode == Astar.Path[Astar.Path.Count - 1])
+        {
+            AStarCount(); // 도착 노드에 도달하면 경로 재계산
+        }
+
+    }
+
+    private void AStarCount()
+    {
+        if (isInSight)
+        {
+            Astar.Destination = target.Astar.CurrentNode.Position; //타겟의 현재 노드 위치를 도착지로 설정
+        }
+        else
+        {
+            GuessTargetPosition(); //타겟의 위치를 추정
+        }
+
         Physics.Raycast(transform.position, -transform.up, out hitBottom, 10f);
         Vector2Int currentPosition = Astar.CurrentNode.Position;
         for (int i = 0; i < Astar.TileDataList.GetLength(0); i++)
@@ -72,13 +100,53 @@ public class ChaserController : CharacterController
         Astar.StartPos = currentPosition; //시작 위치 업데이트
         Astar.OpenList.Add(Astar.TileDataList[currentPosition.x, currentPosition.y]); //열린 타일 리스트에 시작 위치 추가
         Astar.AStarAlgorithm();
-        Move();
+    }
 
 
+    private void GuessTargetPosition()
+    {
+        // 타겟의 위치를 추정하는 로직을 여기에 추가할 수 있습니다.
+        // 예를 들어, 타겟의 이동 방향과 속도를 기반으로 다음 위치를 예측할 수 있습니다.
+    }
+
+
+    public override void HasLineOfSight()
+    {
+        base.HasLineOfSight();
+        Vector3 startWorldPos = transform.position;
+        Vector3 targetPos = target.transform.position;
+        Vector3 targetDirection = (targetPos - startWorldPos).normalized;
+        Vector3 direction = transform.forward;
+
+        float dotProduct = Vector3.Dot(direction, targetDirection);
+        float minDotProduct = Mathf.Cos(viewAngle * 0.5f * Mathf.Deg2Rad);
+        if (dotProduct < minDotProduct)
+        {
+            isInSight = false; // 시야 밖
+        }
+
+
+        RaycastHit hit;
+        if (Physics.Linecast(startWorldPos, targetPos, out hit, LayerMask.GetMask("Wall")))
+        {
+            isInSight = false; // 벽에 가려져 있으면 시야 밖
+            return;
+        }
+        isInSight = true; // 벽에 가려지지 않으면 시야 안
+    }
+    public void EndChase()
+    {
+        Debug.Log("End Chase"); // 추적 종료 로그
+        isChasing = false; // 추적 상태 해제
     }
 
     public void SetStatus()
     {
+        
         status = CharacterStatus.Moving; // 상태를 이동으로 설정
+    }
+    public bool GetState()
+    {
+        return isChasing; // 현재 추적 상태 반환
     }
 }
