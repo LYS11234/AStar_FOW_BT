@@ -12,12 +12,29 @@ public class ChaserController : CharacterController //추격 그만두는 경우
     protected RunnerController target; //타겟 캐릭터
     [SerializeField]
     private bool isChasing = false; // 추적 상태를 나타내는 변수
-
+    [SerializeField]
+    private bool isGuessed; // 타겟 위치 추정 여부
+    private Vector3 targetDir;
+    private Vector2Int targetDir2D;
     protected override void Update()
     {
         base.Update();
         
+        
     }
+
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        if(collision.gameObject.TryGetComponent<RunnerController>(out RunnerController runner))
+        {
+#if UNITY_EDITOR
+            Debug.Log("추격 성공! 게임 종료");
+            UnityEditor.EditorApplication.isPlaying = false;
+#endif
+        }
+    }
+
 
     public void Init(RunnerController _target)
     {
@@ -63,6 +80,7 @@ public class ChaserController : CharacterController //추격 그만두는 경우
     {
         if (isInSight)
         {
+            isGuessed = false; // 타겟이 시야에 있으면 위치 추정 초기화
             Astar.Destination = target.Astar.CurrentNode.Position; //타겟의 현재 노드 위치를 도착지로 설정
         }
         else
@@ -70,6 +88,7 @@ public class ChaserController : CharacterController //추격 그만두는 경우
             GuessTargetPosition(); //타겟의 위치를 추정
         }
 
+      
         Physics.Raycast(transform.position, -transform.up, out hitBottom, 10f);
         Vector2Int currentPosition = Astar.CurrentNode.Position;
         for (int i = 0; i < Astar.TileDataList.GetLength(0); i++)
@@ -105,8 +124,26 @@ public class ChaserController : CharacterController //추격 그만두는 경우
 
     private void GuessTargetPosition()
     {
-        // 타겟의 위치를 추정하는 로직을 여기에 추가할 수 있습니다.
-        // 예를 들어, 타겟의 이동 방향과 속도를 기반으로 다음 위치를 예측할 수 있습니다.
+        if (isGuessed)
+        {
+            return; // 이미 타겟 위치를 추정한 경우, 추가 추정은 하지 않음
+        }
+        isGuessed = true; // 타겟 위치 추정 상태로 변경
+
+        targetDir = target.transform.forward; // 타겟의 이동 방향
+        targetDir2D = new Vector2Int(
+    (int)Mathf.Sign(targetDir.x),
+    (int)Mathf.Sign(targetDir.z)
+);// 2D 방향 벡터로 변환
+
+        if (Astar.TileDataList[(Astar.Destination.x + targetDir2D.x * 2), (Astar.Destination.y + targetDir2D.y * 3)].IsBlock)
+        {
+            Astar.Destination = Astar.Destination + targetDir2D;
+        }
+        else
+        {
+            Astar.Destination = Astar.Destination + targetDir2D * 3; // 타겟의 현재 위치에 이동 방향을 더하여 추정 위치 설정
+        }
     }
 
 
@@ -137,7 +174,9 @@ public class ChaserController : CharacterController //추격 그만두는 경우
     public void EndChase()
     {
         Debug.Log("End Chase"); // 추적 종료 로그
+        Astar.Path.Clear(); // 경로 리스트 초기화
         isChasing = false; // 추적 상태 해제
+        status = CharacterStatus.Moving; // 상태를 대기 상태로 설정
     }
 
     public void SetStatus()

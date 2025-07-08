@@ -345,6 +345,7 @@ public class CharacterController : MonoBehaviour
     }
     public bool GetInSight()
     {
+        Debug.LogWarning(isInSight);
         return isInSight;
     }
 }

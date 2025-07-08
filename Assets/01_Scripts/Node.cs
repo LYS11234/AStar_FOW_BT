@@ -97,6 +97,7 @@ public class Selector : Node
 
         public override NodeState Evaluate()
         {
+            self.HasLineOfSight(); // 플레이어가 시야에 있는지 확인하는 메서드 호출
             if (!self.GetInSight())
             {
                 return NodeState.Failure; // 시야 내에 플레이어가 없으면 실패 반환
@@ -127,17 +128,19 @@ public class Selector : Node
         }
         public override NodeState Evaluate()
         {
-
-            // 플레이어가 시야에 있고
-            // 만약 추적 상태가 아니었다면, 상태를 변경하고 추적 시작
-            if (!self.GetState())
+            if (!self.GetState()) 
             {
                 self.SetStatus(); // CharacterStatus를 Moving으로 설정
+            }
+            if (self.GetState() && self.Astar.Path[self.Astar.Path.Count - 1] == self.Astar.CurrentNode) // 현재 노드가 목적지와 같으면
+            {
+                self.EndChase(); // EndChase() 메서드 호출 (목적지 설정)
+                isChasing = false; // 추적 상태 해제
             }
             chaseAction(); // Chase() 메서드 호출 (경로 계산 및 이동)
 
             // 만약 Chase() 결과 경로를 못찾았다면 추적 실패
-            if (self.Astar.Path.Count == 0)
+            if (self.Astar.Path.Count == 0 )
             {
                 if (self.GetState())
                 {
