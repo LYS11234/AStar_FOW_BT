@@ -23,7 +23,6 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
     private float runTime = 20f; // 도주 시간
     [SerializeField]
     protected ChaserController target; //타겟 캐릭터
-
     Vector3 direction = Vector3.zero;
 
     public bool IsRunning() { return isRunning; }
@@ -53,7 +52,7 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
     protected override void Update()
     {
         base.Update();
-        if (isRunning)
+        if (isRunning && !isInSight)
         {
             RunTimeCheck(); // 도주 시간 체크
         }

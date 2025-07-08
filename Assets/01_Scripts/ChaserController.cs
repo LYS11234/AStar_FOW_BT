@@ -59,7 +59,6 @@ public class ChaserController : CharacterController //추격 그만두는 경우
     {
         if (target == null)
         {
-            isChasing = false; // 타겟이 없으면 추적 상태 해제
             return; //타겟이 없으면 종료
         }
         if(!isChasing)
@@ -181,8 +180,14 @@ public class ChaserController : CharacterController //추격 그만두는 경우
 
     public void SetStatus()
     {
-        
-        status = CharacterStatus.Moving; // 상태를 이동으로 설정
+        if (status == CharacterStatus.Moving)
+        {
+            status = CharacterStatus.Turning; // 상태를 회전으로 설정
+        }
+        else if (status == CharacterStatus.Turning)
+        {
+            status = CharacterStatus.Moving; // 상태를 이동으로 설정
+        }
     }
     public bool GetState()
     {

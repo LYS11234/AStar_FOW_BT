@@ -148,6 +148,7 @@ public class FOW : MonoBehaviour
     private void UpdateFogTexture()
     {
         Color32[] colors = new Color32[tileWidthCount * tileHeightCount];
+        int visibleCount = 0;
         for (int y = 0; y < tileHeightCount; y++)
         {
             for (int x = 0; x < tileWidthCount; x++)
@@ -175,7 +176,7 @@ public class FOW : MonoBehaviour
                     case FogOfWarViewStatus.Visible:
                         {
                             colors[index] = new Color32(0, 0, 0, 0); // 완전 투명
-
+                            visibleCount++;
                             break;
                         }
 
@@ -188,6 +189,7 @@ public class FOW : MonoBehaviour
             }
         }
         fogTexture.SetPixels32(colors);
+        Debug.Log($"Visible Count: {visibleCount}"); // 디버그용으로 가시성 카운트 출력
         fogTexture.Apply(); // 변경사항 GPU에 적용
     }
 
@@ -203,13 +205,8 @@ public class FOW : MonoBehaviour
                 }
             }
         }
-
-
-        if (Characters[1 - nowPlayer].Astar.Path.Count > 0 && Characters[nowPlayer].Astar.Path.Count > 0)
-        {
-            ShowUnitView(position, sightRadius, (byte)(nowPlayer + 1));
-            ShowUnitView(Characters[1 - nowPlayer].Astar.CurrentNode.Position, sightRadius, (byte)(2 - nowPlayer));
-        }
+        ShowUnitView(position, sightRadius, (byte)(nowPlayer + 1));
+        ShowUnitView(Characters[1 - nowPlayer].Astar.CurrentNode.Position, sightRadius, (byte)(2 - nowPlayer));
         UpdateFogTexture();
     }
 

@@ -211,6 +211,10 @@ public class Selector : Node
             {
                 self.Astar.StartPos = self.Astar.CurrentNode.Position; // 현재 위치를 시작 위치로 설정
                 setDestination(); // 새로운 목적지 설정
+                if(self.TryGetComponent<ChaserController>(out ChaserController chaser))
+                {
+                    Debug.Log("추적자 순찰 중");
+                }
                 return NodeState.Success;
             }
             move(); // 현재 목적지로 이동
