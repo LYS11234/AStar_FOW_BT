@@ -12,5 +12,5 @@ A\*: G + H = F 를 이용해 타일데이터 배열에서 타일데이터를 빠
 
 
 
-Behavior Tree: 클래스로 나누어 실패 반환 시 처음부터 실행되도록 만듦. CheckPlayerInSightNode에서 타겟 유닛 탐지 -> 탐지시 Chase나 RunAway로, 아니면 Patrol로 동작하도록
+Behavior Tree: 클래스로 나누어 실패 반환 시 처음부터 실행되도록 만듦. CheckPlayerInSightNode에서 내적으로 타겟 유닛이 시야 내에 있는지 탐지 -> 탐지시 Chase나 RunAway로, 아니면 Patrol로 동작하도록
 
