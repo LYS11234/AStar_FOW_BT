@@ -158,6 +158,9 @@ public class CharacterController : MonoBehaviour
     [SerializeField]
     protected bool isInSight;
     private bool isMoving;
+    protected float velocity = 2f;
+    [SerializeField]
+    protected bool isActioning = false; //행동 중인지 여부
     #endregion
 
     #region AI
@@ -219,6 +222,10 @@ public class CharacterController : MonoBehaviour
 
     protected void Move()
     {
+        if(isActioning)
+        {
+            return; //행동 중이면 이동하지 않음
+        }
         if (status == CharacterStatus.Moving)
         {
             MoveFront();
@@ -280,7 +287,7 @@ public class CharacterController : MonoBehaviour
         isMoving = true;
         transform.position = Vector3.MoveTowards(transform.position,
             Tiles[Astar.Path[movementCount].Position.x, Astar.Path[movementCount].Position.y].position + new Vector3(0, 0.5f, 0),
-            Time.deltaTime * 2f);
+            Time.deltaTime * velocity);
 
 
     }
@@ -307,15 +314,13 @@ public class CharacterController : MonoBehaviour
         // y축은 무시하여 수평 회전만 하도록 보장
         targetDirection.y = 0;
 
-        if (Vector3.Angle(transform.forward, targetDirection) > 0.1f && targetDirection != Vector3.zero)
-        {
-            Quaternion targetRotation = Quaternion.LookRotation(targetDirection);
-            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, 360f * Time.deltaTime);
-        }
-        else // 회전이 완료되면 이동 상태로 변경
+        if (Vector3.Angle(transform.forward, targetDirection) < 0.1f || targetDirection == Vector3.zero)
         {
             status = CharacterStatus.Moving;
+            return;
         }
+        Quaternion targetRotation = Quaternion.LookRotation(targetDirection);
+        transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, 360f * Time.deltaTime);
     }
 
     // ✨ 기존 Turn() 메소드는 내부 로직을 수정
@@ -345,7 +350,6 @@ public class CharacterController : MonoBehaviour
     }
     public bool GetInSight()
     {
-        Debug.LogWarning(isInSight);
         return isInSight;
     }
 }

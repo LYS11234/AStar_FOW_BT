@@ -114,16 +114,12 @@ public class Selector : Node
     public class ChaseNode : Node
     {
         private readonly ChaserController self;
-        private readonly CharacterController player;
-        private readonly float sightRange;
         private Action chaseAction;
-        bool isChasing = false; // 추적 상태를 나타내는 변수
 
-        public ChaseNode(ChaserController self, CharacterController player, float sightRange, Action chaseAction)
+
+        public ChaseNode(ChaserController self, Action chaseAction)
         {
             this.self = self;
-            this.player = player;
-            this.sightRange = sightRange;
             this.chaseAction = chaseAction;
         }
         public override NodeState Evaluate()
@@ -135,7 +131,6 @@ public class Selector : Node
             if (self.GetState() && self.Astar.Path[self.Astar.Path.Count - 1] == self.Astar.CurrentNode) // 현재 노드가 목적지와 같으면
             {
                 self.EndChase(); // EndChase() 메서드 호출 (목적지 설정)
-                isChasing = false; // 추적 상태 해제
             }
             chaseAction(); // Chase() 메서드 호출 (경로 계산 및 이동)
 
@@ -145,7 +140,7 @@ public class Selector : Node
                 if (self.GetState())
                 {
                     self.EndChase(); // EndChase() 메서드 호출 (목적지 설정)
-                    isChasing = false; // 추적 상태 해제
+                    return NodeState.Success; // Success를 반환하여 다음 프레임에 PatrolNode가 자연스럽게 실행되도록 함
                 }
                 return NodeState.Failure; // 실패 반환하여 다른 행동(순찰)을 하도록 유도
             }
@@ -153,7 +148,7 @@ public class Selector : Node
 
             // 플레이어가 시야에 없으면 추적 종료
 
-            return NodeState.Success; // Success를 반환하여 다음 프레임에 PatrolNode가 자연스럽게 실행되도록 함
+            
 
         }
     }

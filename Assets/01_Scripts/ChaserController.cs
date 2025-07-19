@@ -46,7 +46,7 @@ public class ChaserController : CharacterController //추격 그만두는 경우
             new Sequence(new List<Node>
             {
                 new CheckPlayerInSightNode(this, target, sightDistance),
-                new ChaseNode(this, target, sightDistance, Chase)
+                new ChaseNode(this, Chase)
             }),
             // 기본 행동: 순찰
            new PatrolNode(this, Move, SetDestination)
@@ -134,15 +134,16 @@ public class ChaserController : CharacterController //추격 그만두는 경우
     (int)Mathf.Sign(targetDir.x),
     (int)Mathf.Sign(targetDir.z)
 );// 2D 방향 벡터로 변환
+        int length = 0;
 
-        if (Astar.TileDataList[(Astar.Destination.x + targetDir2D.x * 2), (Astar.Destination.y + targetDir2D.y * 3)].IsBlock)
+        do
         {
-            Astar.Destination = Astar.Destination + targetDir2D;
+            length++;
         }
-        else
-        {
-            Astar.Destination = Astar.Destination + targetDir2D * 3; // 타겟의 현재 위치에 이동 방향을 더하여 추정 위치 설정
-        }
+        while (length < 20 && !Astar.TileDataList[(Astar.Destination.x + targetDir2D.x * length), (Astar.Destination.y + targetDir2D.y * length)].IsBlock);
+
+        Astar.Destination = Astar.Destination + targetDir2D * length; // 타겟의 현재 위치에 이동 방향을 더하여 추정 위치 설정
+
     }
 
 

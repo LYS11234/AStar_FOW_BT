@@ -5,6 +5,8 @@ using System.Collections;
 
 using static Selector;
 using UnityEditor.Experimental.GraphView;
+using Unity.VisualScripting;
+using Unity.Android.Gradle.Manifest;
 
 public class RunnerController : CharacterController // 도주하는 방식에 오류가 있음. 확인할 것.
 {
@@ -24,6 +26,9 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
     [SerializeField]
     protected ChaserController target; //타겟 캐릭터
     Vector3 direction = Vector3.zero;
+
+    [SerializeField]
+    private bool isTurnning;
 
     public bool IsRunning() { return isRunning; }
 
@@ -52,29 +57,28 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
     protected override void Update()
     {
         base.Update();
-        if (isRunning && !isInSight)
+        HasLineOfSight(); // 타겟과의 시야 확인
+        if (isRunning)
         {
             RunTimeCheck(); // 도주 시간 체크
+            return;
         }
+        
     }
     private void Run()
     {
         isRunning = true;
-
+        velocity = 3f;
         if (!firstRunTurn)
         {
-            if (!firstRunTurn) // 이전에 추가했던 코루틴 가드 로직
-            {
-                status = CharacterStatus.Turning;
-                StartRunningTurn(); // 첫 도주 회전 시작
-            }
+            status = CharacterStatus.Turning;
+            StartRunningTurn(); // 첫 도주 회전 시작
             return;
         }
 
         if (status == CharacterStatus.Turning)
         {
-            targetPos = transform.position + direction * 10f;
-            base.TurnTowards(targetPos);
+            TurnTowards(targetPos); // 타겟 위치로 회전
             return;
         }
         if (status == CharacterStatus.Moving)
@@ -116,7 +120,7 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
 
     private void RunFront()
     {
-        if (Physics.Raycast(transform.position, transform.forward, out hit, runSightDistance, 1 << 6))
+        if (Physics.Raycast(transform.position, transform.forward, out hit, runSightDistance, 1 << 6) && !isTurnning)
         {
 
             float distanceL = float.MaxValue;
@@ -132,6 +136,7 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
             this.direction = (distanceL > distanceR) ? -transform.right : transform.right;
 
             status = CharacterStatus.Turning;
+            targetPos = SnapCardinal(direction);
             return;
         }
 
@@ -162,6 +167,46 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
     }
 
 
+    protected Vector3 SnapCardinal(Vector3 targetDirection)
+    {
+        targetDirection.y = 0;
+        // y축 방향을 0으로 설정하여 수평 방향으로만 회전
+        targetDirection.Normalize();
+        Vector3 dir = Vector3.zero;
+        if (Mathf.Abs(targetDirection.x) > Mathf.Abs(targetDirection.z))
+        {
+            dir = new Vector3(Mathf.Sign(targetDirection.x), 0, 0); // x축 방향으로 회전
+        }
+        else
+        {
+            dir = new Vector3(0, 0, Mathf.Sign(targetDirection.z)); // z축 방향으로 회전
+        }
+
+        return dir;
+    }
+
+    //protected void TurnTowards(Vector3 targetDirection)
+    //{
+    //    targetDirection.y = 0;
+    //    if (Vector3.Angle(transform.forward, targetDirection) % 90f > 0)
+    //    {
+    //        float
+    //        //if (transform.eulerAngles.y % 90 < 0.1f || transform.eulerAngles.y % 90 > 89.9f)
+    //        //{
+    //        //    float angle = 90 - transform.eulerAngles.y % 90 < 0.1f ? 0 : transform.eulerAngles.y % 90 - 90;
+    //        //    Debug.Log($"회전 각도: {angle}");
+    //        //    Debug.Log($"현재 회전 각도: {transform.eulerAngles.y}");
+    //        //    transform.eulerAngles = new Vector3(0, transform.eulerAngles.y + angle);
+    //        //    isTurnning = false; // 회전 완료
+    //        //    status = CharacterStatus.Moving;
+    //        //    return;
+    //        //}
+    //    }
+    //    Quaternion targetRotation = Quaternion.LookRotation(targetDirection);
+    //    transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, 360f * Time.deltaTime);
+    //}
+
+
     public override void HasLineOfSight()
     {
         base.HasLineOfSight();
@@ -175,6 +220,7 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
         if (dotProduct < minDotProduct)
         {
             isInSight = false; // 시야 밖
+            return;
         }
 
 
@@ -189,9 +235,10 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
 
     private void StartRunningTurn()
     {
+        isActioning = true; // 행동 중 상태 설정
         if (!isInitialTurnStarted)
         {
-            direction = -transform.forward;
+            direction = SnapCardinal(-transform.forward); // 현재 방향을 90도로 스냅
             isInitialTurnStarted = true; 
         }
         if (runTime <= 0f)
@@ -209,13 +256,18 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
         }
         Quaternion targetRotation = Quaternion.LookRotation(direction);
         transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, 360f * Time.deltaTime);        
+        ResetPath(); // A* 경로 초기화
     }
 
     public void ResetRun()
     {
         Debug.Log("도주 초기화");
+        isActioning = false; // 행동 중 상태 해제
+        velocity = 2f; // 속도 초기화    
+        isInitialTurnStarted = false; // 첫 도주 회전 상태 초기화
         firstRunTurn = false;
         isRunning = false; // 도주 상태 초기화
+        isTurnning = false; // 회전 상태 초기화
         runTime = 20f; // 도주 시간 초기화
         ResetPath(); // A* 경로 초기화
     }

@@ -45,16 +45,17 @@ public class FOW : MonoBehaviour
     public CharacterController[] Characters;
     private byte maxPlayers = 2;
     [SerializeField]
-    private Transform[] characterTf = new Transform[2];
+    private Transform[] characterTf;
 
     public float viewAngle;
     private float viewRad;
     [SerializeField] private TMP_Dropdown dropdown;
     private byte nowPlayer;
-    private bool isStart;
+
 
     public void Init(int _tileWidthCount, int _tileHeightCount)
     {
+        characterTf = new Transform[maxPlayers];
         tileWidthCount = _tileWidthCount;
         tileHeightCount = _tileHeightCount;
         CreateFogTexture();
@@ -75,7 +76,6 @@ public class FOW : MonoBehaviour
         characterTf[1] = Characters[1].transform;
         viewRad = viewAngle * Mathf.Deg2Rad;
         UpdateFogTexture();
-        isStart = true;
         OnValueChange();
     }
 
@@ -189,7 +189,6 @@ public class FOW : MonoBehaviour
             }
         }
         fogTexture.SetPixels32(colors);
-        Debug.Log($"Visible Count: {visibleCount}"); // 디버그용으로 가시성 카운트 출력
         fogTexture.Apply(); // 변경사항 GPU에 적용
     }
 

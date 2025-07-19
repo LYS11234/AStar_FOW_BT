@@ -125,11 +125,15 @@ MonoBehaviour:
   movementCount: 0
   sightDistance: 4
   status: 0
+  targetPos: {x: 0, y: 0, z: 0}
+  isInSight: 0
+  isActioning: 0
   firstRunTurn: 0
   isRunning: 0
   isInitialTurnStarted: 0
-  runTime: 5
+  runTime: 20
   target: {fileID: 0}
+  isTurnning: 0
 --- !u!54 &2447871280707816977
 Rigidbody:
   m_ObjectHideFlags: 0
