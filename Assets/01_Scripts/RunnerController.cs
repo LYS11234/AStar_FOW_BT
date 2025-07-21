@@ -120,7 +120,11 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
 
     private void RunFront()
     {
-        if (Physics.Raycast(transform.position, transform.forward, out hit, runSightDistance, 1 << 6) && !isTurnning)
+        if(isTurnning)
+        {
+            return;
+        }
+        if (Physics.Raycast(transform.position, transform.forward, out hit, runSightDistance, 1 << 6) || isInSight)
         {
 
             float distanceL = float.MaxValue;

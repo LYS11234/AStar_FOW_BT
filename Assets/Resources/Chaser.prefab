@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 5252323558213314795}
   - component: {fileID: 4755890815786023737}
   - component: {fileID: 2447871280707816977}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Chaser
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -51,7 +51,12 @@ MonoBehaviour:
   movementCount: 0
   sightDistance: 4
   status: 0
+  targetPos: {x: 0, y: 0, z: 0}
+  isInSight: 0
+  isActioning: 0
   target: {fileID: 0}
+  isChasing: 0
+  isGuessed: 0
 --- !u!33 &6324514492110511704
 MeshFilter:
   m_ObjectHideFlags: 0

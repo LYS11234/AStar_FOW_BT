@@ -146,7 +146,6 @@ public class Selector : Node
             }
             return NodeState.Running; // 추적이 계속 진행 중
 
-            // 플레이어가 시야에 없으면 추적 종료
 
             
 

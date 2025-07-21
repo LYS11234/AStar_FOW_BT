@@ -378,15 +378,28 @@ public class FOW : MonoBehaviour
             }
         }
 
-        if (nowPlayer >= 2)
-        {
-            Characters[0].gameObject.layer = VisibleLayer;
-            Characters[1].gameObject.layer = VisibleLayer; ;
-            return;
-        }
-        Characters[nowPlayer].gameObject.layer = VisibleLayer;
-        Characters[1 - nowPlayer].gameObject.layer = InvisibleLayer;
 
+        switch(nowPlayer)
+        {
+            case 0:
+                {
+                    Camera.main.cullingMask -= (1 << VisibleLayer);
+                    Camera.main.cullingMask += (1 << InvisibleLayer);
+                    break;
+                }
+            case 1:
+                {
+                    Camera.main.cullingMask -= (1 << InvisibleLayer);
+                    Camera.main.cullingMask += (1 << VisibleLayer);
+                    break;
+                }
+            default:
+                {
+                    Camera.main.cullingMask += (1 << VisibleLayer);
+                    Camera.main.cullingMask += (1 << InvisibleLayer);
+                    break;
+                }
+        }
     }
 
     private void CheckDistance()
