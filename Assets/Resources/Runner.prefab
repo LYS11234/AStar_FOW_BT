@@ -128,6 +128,7 @@ MonoBehaviour:
   targetPos: {x: 0, y: 0, z: 0}
   isInSight: 0
   isActioning: 0
+  layer: 8
   firstRunTurn: 0
   isRunning: 0
   isInitialTurnStarted: 0

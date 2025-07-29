@@ -39,8 +39,9 @@ public class FOW : MonoBehaviour
     public int tileWidthCount;
     public int tileHeightCount;
 
-    private const int VisibleLayer = 8;
-    private const int InvisibleLayer = 9;
+    private const int RunnerLayer = 8;
+    private const int ChaserLayer = 9;
+    private const int VisibleLayer = 10;
 
     public CharacterController[] Characters;
     private byte maxPlayers = 2;
@@ -51,6 +52,8 @@ public class FOW : MonoBehaviour
     private float viewRad;
     [SerializeField] private TMP_Dropdown dropdown;
     private byte nowPlayer;
+    [SerializeField]
+    private Camera camera;
 
 
     public void Init(int _tileWidthCount, int _tileHeightCount)
@@ -59,7 +62,7 @@ public class FOW : MonoBehaviour
         tileWidthCount = _tileWidthCount;
         tileHeightCount = _tileHeightCount;
         CreateFogTexture();
-
+        camera = Camera.main;
         fogOfWarStatuses = new FogOfWarStatus[tileWidthCount, tileHeightCount];
 
         for (var i = 0; i < tileHeightCount; i++)
@@ -81,15 +84,6 @@ public class FOW : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (nowPlayer < Characters.Length)
-        {
-            //if (Characters[nowPlayer].IsMoving())
-            //{
-            //    return;
-            //}
-
-            CheckDistance();
-        }
         ShowFOWView();
     }
 
@@ -378,31 +372,34 @@ public class FOW : MonoBehaviour
             }
         }
 
-
-        switch(nowPlayer)
+        
+        switch (nowPlayer)
         {
             case 0:
                 {
-                    Camera.main.cullingMask -= (1 << VisibleLayer);
-                    Camera.main.cullingMask += (1 << InvisibleLayer);
+                    camera.cullingMask |= (1 << ChaserLayer);      // ChaserLayer 활성화
+                    camera.cullingMask &= ~(1 << RunnerLayer);     // RunnerLayer 비활성화
+                    Debug.Log("Chaser Layer 활성화");
                     break;
                 }
             case 1:
                 {
-                    Camera.main.cullingMask -= (1 << InvisibleLayer);
-                    Camera.main.cullingMask += (1 << VisibleLayer);
+                    camera.cullingMask |= (1 << RunnerLayer);      // RunnerLayer 활성화
+                    camera.cullingMask &= ~(1 << ChaserLayer);     // ChaserLayer 비활성화
+                    Debug.Log("Runner Layer 활성화");
                     break;
                 }
             default:
                 {
-                    Camera.main.cullingMask += (1 << VisibleLayer);
-                    Camera.main.cullingMask += (1 << InvisibleLayer);
+                    camera.cullingMask |= (1 << RunnerLayer);      // RunnerLayer 활성화
+                    camera.cullingMask |= (1 << ChaserLayer);      // ChaserLayer 활성화
+                    Debug.Log("모든 레이어 활성화");
                     break;
                 }
         }
     }
 
-    private void CheckDistance()
+    public void CheckDistance()
     {
         if (nowPlayer >= 2)
         {
@@ -411,7 +408,7 @@ public class FOW : MonoBehaviour
         Vector2Int position = Characters[1 - nowPlayer].Astar.CurrentNode.Position;
         if (fogOfWarStatuses[position.x, position.y].status != FogOfWarViewStatus.Visible)
         {
-            Characters[1 - nowPlayer].gameObject.layer = InvisibleLayer; ;
+            Characters[1 - nowPlayer].SetVisible();
         }
         else
         {

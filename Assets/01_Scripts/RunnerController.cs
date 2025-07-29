@@ -38,6 +38,7 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
         target = _target;
         runSightDistance = 1.5f;
         this.viewAngle = viewAngle;
+        SetVisible();
         rootNode = new Selector(new List<Node>
         {
             new RunAwayNode(this, target, Run),
@@ -110,7 +111,7 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
     public void StartAstar()
     {
         Astar.StartPos = Astar.CurrentNode.Position; //시작 위치 업데이트
-        Astar.OpenList.Add(Astar.CurrentNode); //열린 타일 리스트에 시작 위치 추가
+        Astar.OpenList.Enqueue(Astar.CurrentNode); //열린 타일 리스트에 시작 위치 추가
         Astar.Destination = new Vector2Int(Random.Range(0, Tiling.Instance.Tiles.GetLength(0) - 1), Random.Range(0, Tiling.Instance.Tiles.GetLength(1) - 1));
         Astar.AStarAlgorithm(); //A* 알고리즘 실행
     }
@@ -224,7 +225,8 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
         if (dotProduct < minDotProduct)
         {
             isInSight = false; // 시야 밖
-            return;
+            SetTargetVisible(isInSight); // 타겟을 보이지 않게 설정
+            return; // 시야 밖이면 더 이상 진행하지 않음
         }
 
 
@@ -232,10 +234,24 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
         if (Physics.Linecast(startWorldPos, targetPos, out hit, LayerMask.GetMask("Wall")))
         {
             isInSight = false; // 벽에 가려져 있으면 시야 밖
+        }
+        else
+        {
+            isInSight = true; // 벽에 가려지지 않으면 시야 안
+        }
+        SetTargetVisible(isInSight); // 타겟의 가시성 설정
+    }
+
+    protected void SetTargetVisible(bool visible)
+    {
+        if (visible)
+        {
+            target.gameObject.layer = 10; // 타겟 레이어 설정
             return;
         }
-        isInSight = true; // 벽에 가려지지 않으면 시야 안
+        target.SetVisible(); // 타겟을 보이지 않게 설정
     }
+
 
     private void StartRunningTurn()
     {

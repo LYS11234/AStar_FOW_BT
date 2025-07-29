@@ -54,6 +54,7 @@ MonoBehaviour:
   targetPos: {x: 0, y: 0, z: 0}
   isInSight: 0
   isActioning: 0
+  layer: 9
   target: {fileID: 0}
   isChasing: 0
   isGuessed: 0

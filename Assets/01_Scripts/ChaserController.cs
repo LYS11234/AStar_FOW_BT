@@ -39,6 +39,7 @@ public class ChaserController : CharacterController //추격 그만두는 경우
     public void Init(RunnerController _target)
     {
         target = _target;
+        SetVisible();
         // 행동 트리 구성
         rootNode = new Selector(new List<Node>
         {
@@ -116,7 +117,7 @@ public class ChaserController : CharacterController //추격 그만두는 경우
             }
         }
         Astar.StartPos = currentPosition; //시작 위치 업데이트
-        Astar.OpenList.Add(Astar.TileDataList[currentPosition.x, currentPosition.y]); //열린 타일 리스트에 시작 위치 추가
+        Astar.OpenList.Enqueue(Astar.TileDataList[currentPosition.x, currentPosition.y]); //열린 타일 리스트에 시작 위치 추가
         Astar.AStarAlgorithm();
     }
 
@@ -160,6 +161,8 @@ public class ChaserController : CharacterController //추격 그만두는 경우
         if (dotProduct < minDotProduct)
         {
             isInSight = false; // 시야 밖
+            SetTargetVisible(false); // 타겟을 보이지 않게 설정
+            return; // 시야 밖이면 더 이상 진행하지 않음
         }
 
 
@@ -167,10 +170,24 @@ public class ChaserController : CharacterController //추격 그만두는 경우
         if (Physics.Linecast(startWorldPos, targetPos, out hit, LayerMask.GetMask("Wall")))
         {
             isInSight = false; // 벽에 가려져 있으면 시야 밖
+        }
+        else
+        {
+            isInSight = true; // 벽에 가려지지 않으면 시야 안
+        }
+        SetTargetVisible(isInSight); // 타겟의 가시성 설정
+    }
+
+    protected void SetTargetVisible(bool visible)
+    {
+        if (visible)
+        {
+            target.gameObject.layer = 10; // 타겟 레이어 설정
             return;
         }
-        isInSight = true; // 벽에 가려지지 않으면 시야 안
+        target.SetVisible(); // 타겟을 보이지 않게 설정
     }
+
     public void EndChase()
     {
         Debug.Log("End Chase"); // 추적 종료 로그

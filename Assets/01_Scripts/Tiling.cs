@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using Random = UnityEngine.Random;
 
 
-public class TileData
+public class TileData : IComparable<TileData>
 {
     public Vector2Int Position; //타일 위치
     public int FValue;
@@ -16,6 +16,23 @@ public class TileData
 
     public TileData Parent; //부모 타일
     public string Name; //타일 이름
+
+    public TileData()
+    {
+        Position = new Vector2Int(0, 0);
+        FValue = 0;
+        GValue = 0;
+        HValue = 0;
+        IsBlock = false;
+        Parent = null;
+        Name = string.Empty;
+    }
+    public int CompareTo(TileData other)
+    {
+        if (other == null) return 1; // null인 경우 현재 객체가 더 큼
+        if (FValue == other.FValue) return 0; // FValue가 같으면 0 반환
+        return FValue.CompareTo(other.FValue); // FValue를 기준으로 비교
+    }
 }
 
 
