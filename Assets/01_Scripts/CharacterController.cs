@@ -5,6 +5,7 @@ using System.Linq;
 
 using Random = UnityEngine.Random;
 using static UnityEngine.GraphicsBuffer;
+using Unity.VisualScripting;
 
 
 public class PriorityQueue<T> where T : IComparable<T>
@@ -229,13 +230,15 @@ public class AStar
 
 }
 
-public class CharacterController : MonoBehaviour
+public class CharacterController : MonoBehaviour, ISubject
 {
     #region A* Algorithm Variables
     [Header("A* Algorithm Variables")]
     public readonly AStar Astar = new AStar();
 
     #endregion
+
+    
 
     #region Character Movement Variables
     private bool isStart;
@@ -269,20 +272,35 @@ public class CharacterController : MonoBehaviour
     [SerializeField]
     protected byte layer;
 
+    public List<IObserver> Observer { get; protected set; } = new List<IObserver>();//옵저버 인터페이스
+    protected GameManager gameManager;
 
+    #region Sight
+    protected Vector4 revealerPosition = new Vector4(); //시야 위치 배열
+    [SerializeField]
+    protected float revealerRad = 0; //시야 반지름 배열
 
-    private void Start()
+    [SerializeField]
+    protected Camera depthCamera; //뎁스 카메라
+    [SerializeField]
+    protected RenderTexture depthTexture; //뎁스 텍스처
+    #endregion
+
+    protected void GetStart()
     {
-        Astar.Status = status;
-        fogOfWar = FOW.Instance;
+        if (gameManager.IsUnityNull())
+        {
+            gameManager = GameManager.Instance;
+
+            Astar.Status = status;
+            fogOfWar = gameManager.fow; //FOW 인스턴스 가져오기
+            
+            depthTexture = new RenderTexture(ConstVariables.Resolution, ConstVariables.Resolution, 24, RenderTextureFormat.Depth); //뎁스 텍스처 생성
+            depthCamera.targetTexture = depthTexture; //뎁스 카메라의 타겟 텍스처 설정
+        }
     }
     protected virtual void Update()
     {
-        if (!isStart)
-        {
-            return;
-        }
-
         rootNode.Evaluate();
     }
 
@@ -290,11 +308,10 @@ public class CharacterController : MonoBehaviour
 
     protected void SetDestination()
     {
-        
-        
+       
         Random.InitState((int)DateTime.Now.Ticks); //랜덤 시드 초기화
         movementCount = 0; //이동 카운트 초기화
-        Astar.Destination = new Vector2Int(Random.Range(0, Tiling.Instance.Tiles.GetLength(0) - 1), Random.Range(0, Tiling.Instance.Tiles.GetLength(1) - 1));
+        Astar.Destination = new Vector2Int(Random.Range(0, gameManager.tiling.Tiles.GetLength(0) - 1), Random.Range(0, gameManager.tiling.Tiles.GetLength(1) - 1));
         Astar.Path.Clear(); //경로 리스트 초기화
         Astar.OpenList.Clear(); //열린 타일 리스트 초기화
         Astar.ClosedList.Clear(); //닫힌 타일 리스트 초기화
@@ -312,7 +329,7 @@ public class CharacterController : MonoBehaviour
 
         while (Astar.TileDataList[Astar.Destination.x, Astar.Destination.y].IsBlock)
         {
-            Astar.Destination = new Vector2Int(Random.Range(0, Tiling.Instance.Tiles.GetLength(0) - 1), Random.Range(0, Tiling.Instance.Tiles.GetLength(1) - 1));
+            Astar.Destination = new Vector2Int(Random.Range(0, gameManager.tiling.Tiles.GetLength(0) - 1), Random.Range(0, gameManager.tiling.Tiles.GetLength(1) - 1));
         }
         Astar.OpenList.Enqueue(Astar.TileDataList[Astar.StartPos.x, Astar.StartPos.y]);
         isStart = true; //경로 찾기 시작 플래그 설정
@@ -341,8 +358,9 @@ public class CharacterController : MonoBehaviour
 
     public virtual void HasLineOfSight()
     {
-        
-        
+        revealerPosition = transform.position; //시야 위치 설정
+        revealerRad = sightDistance; //시야 반지름 설정
+
     }
     public CharacterStatus GetStatus()
     {
@@ -371,26 +389,26 @@ public class CharacterController : MonoBehaviour
             //return;
         }
 
-        if (Vector3.Distance(transform.position, targetPos) <= 0.1f)
+        if (Vector3.Distance(transform.position, targetPos) > 0.1f)
         {
-            transform.position = targetPos;
-            if (movementCount >= 1 && movementCount < Astar.Path.Count)
-            {
-                Astar.CurrentNode = Astar.Path[movementCount - 1]; //현재 노드 업데이트
-            }
-            
-
-
-            movementCount++;
-            SetTargetPos();
-            isMoving = false;
+            isMoving = true;
+            transform.position = Vector3.MoveTowards(transform.position,
+                Tiles[Astar.Path[movementCount].Position.x, Astar.Path[movementCount].Position.y].position + new Vector3(0, 0.5f, 0),
+                Time.deltaTime * velocity);
             return;
         }
-        isMoving = true;
-        transform.position = Vector3.MoveTowards(transform.position,
-            Tiles[Astar.Path[movementCount].Position.x, Astar.Path[movementCount].Position.y].position + new Vector3(0, 0.5f, 0),
-            Time.deltaTime * velocity);
+        
+        transform.position = targetPos;
+        if (movementCount >= 1 && movementCount < Astar.Path.Count)
+        {
+            Astar.CurrentNode = Astar.Path[movementCount - 1]; //현재 노드 업데이트
+        }
 
+
+
+        movementCount++;
+        SetTargetPos();
+        isMoving = false;
 
     }
 
@@ -406,8 +424,8 @@ public class CharacterController : MonoBehaviour
                 Astar.CurrentNode = Astar.Path[movementCount - 1]; //현재 노드 업데이트
             }
         }
-        
-        
+
+        NotifyObservers(ConstDataType.fowSight, layer, depthTexture);
         
     }
 
@@ -460,4 +478,53 @@ public class CharacterController : MonoBehaviour
     {
         return isInSight;
     }
+
+    public void RegisterObserver(IObserver observer)
+    {
+        if(Observer.Contains(observer))
+        {
+            return; //이미 등록된 옵저버는 추가하지 않음
+        }
+        Observer.Add(observer); //옵저버 리스트에 추가
+    }
+    public void UnregisterObserver(IObserver observer)
+    {
+        Observer.Remove(observer); //옵저버 리스트에서 제거
+    }
+    public void NotifyObservers(byte eventType, object data)
+    {
+
+    }
+
+    public void NotifyObservers(byte eventType, object data0, object data1)
+    {
+        switch (eventType)
+        {
+            case ConstDataType.hasLineOfSight:
+                {
+                    Observer[ConstTypes.FOW].OnNotify(eventType, data0, data1);
+                    break;
+                }
+            case ConstDataType.action:
+                {
+                    break;
+                }
+            case ConstDataType.fow:
+                {
+                    
+                    break;
+                }
+            case ConstDataType.fowSight:
+                {
+                    Observer[ConstTypes.FOW].OnNotify(eventType, data0, data1);
+                    break;
+                }
+            default:
+                {
+                    
+                    break;
+                }
+        }
+    }
+
 }

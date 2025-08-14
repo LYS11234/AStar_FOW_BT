@@ -8,7 +8,7 @@ using UnityEditor.Experimental.GraphView;
 using Unity.VisualScripting;
 using Unity.Android.Gradle.Manifest;
 
-public class RunnerController : CharacterController // 도주하는 방식에 오류가 있음. 확인할 것.
+public class RunnerController : CharacterController 
 {
     [SerializeField]
     private RaycastHit hit;
@@ -35,6 +35,7 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
 
     public void Init(ChaserController _target, float viewAngle)
     {
+        GetStart();
         target = _target;
         runSightDistance = 1.5f;
         this.viewAngle = viewAngle;
@@ -112,7 +113,7 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
     {
         Astar.StartPos = Astar.CurrentNode.Position; //시작 위치 업데이트
         Astar.OpenList.Enqueue(Astar.CurrentNode); //열린 타일 리스트에 시작 위치 추가
-        Astar.Destination = new Vector2Int(Random.Range(0, Tiling.Instance.Tiles.GetLength(0) - 1), Random.Range(0, Tiling.Instance.Tiles.GetLength(1) - 1));
+        Astar.Destination = new Vector2Int(Random.Range(0, gameManager.tiling.Tiles.GetLength(0) - 1), Random.Range(0, gameManager.tiling.Tiles.GetLength(1) - 1));
         Astar.AStarAlgorithm(); //A* 알고리즘 실행
     }
 
@@ -189,27 +190,6 @@ public class RunnerController : CharacterController // 도주하는 방식에 �
 
         return dir;
     }
-
-    //protected void TurnTowards(Vector3 targetDirection)
-    //{
-    //    targetDirection.y = 0;
-    //    if (Vector3.Angle(transform.forward, targetDirection) % 90f > 0)
-    //    {
-    //        float
-    //        //if (transform.eulerAngles.y % 90 < 0.1f || transform.eulerAngles.y % 90 > 89.9f)
-    //        //{
-    //        //    float angle = 90 - transform.eulerAngles.y % 90 < 0.1f ? 0 : transform.eulerAngles.y % 90 - 90;
-    //        //    Debug.Log($"회전 각도: {angle}");
-    //        //    Debug.Log($"현재 회전 각도: {transform.eulerAngles.y}");
-    //        //    transform.eulerAngles = new Vector3(0, transform.eulerAngles.y + angle);
-    //        //    isTurnning = false; // 회전 완료
-    //        //    status = CharacterStatus.Moving;
-    //        //    return;
-    //        //}
-    //    }
-    //    Quaternion targetRotation = Quaternion.LookRotation(targetDirection);
-    //    transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, 360f * Time.deltaTime);
-    //}
 
 
     public override void HasLineOfSight()

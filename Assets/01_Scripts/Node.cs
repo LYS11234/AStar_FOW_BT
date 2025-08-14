@@ -80,8 +80,8 @@ public class Selector : Node
         // 모든 자식이 실패했을 때만 실패 반환
         return NodeState.Failure;
     }
-    
-    
+
+}
     public class CheckPlayerInSightNode : Node
     {
         private readonly CharacterController self;
@@ -216,21 +216,19 @@ public class Selector : Node
         }
     }
 
-    public class ActionNode : Node
+public class ActionNode : Node
+{
+    private readonly Action action;
+
+    public ActionNode(Action action)
     {
-        private readonly Action action;
-
-        public ActionNode(Action action)
-        {
-            this.action = action;
-        }
-
-        public override NodeState Evaluate()
-        {
-            action();
-            return NodeState.Success;
-        }
+        this.action = action;
     }
 
+    public override NodeState Evaluate()
+    {
+        action();
+        return NodeState.Success;
+    }
 }
 

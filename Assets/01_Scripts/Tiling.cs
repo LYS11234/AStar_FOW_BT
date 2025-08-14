@@ -38,22 +38,10 @@ public class TileData : IComparable<TileData>
 
 public class Tiling : MonoBehaviour
 {
-    public static Tiling Instance; //싱글톤 인스턴스
     [SerializeField]
     private FOW fogOfWar;
-    private void Awake()
-    {
-        if (Instance == null)
-        {
-            Instance = this; //싱글톤 인스턴스 설정
-        }
-        else
-        {
-            Destroy(gameObject); //중복 인스턴스 삭제
-        }
-    }
 
-
+    private GameManager gameManager; //게임 매니저
     private float width; //오브젝트의 너비
     private float height; //오브젝트의 높이
 
@@ -73,6 +61,7 @@ public class Tiling : MonoBehaviour
 
     void Start()
     {
+        gameManager = GameManager.Instance; //게임 매니저 인스턴스 가져오기
         width = transform.localScale.x;//오브젝트의 너비
         height = transform.localScale.z; //오브젝트의 높이
         tileWidth = 0.2f; //타일의 너비
@@ -133,10 +122,13 @@ public class Tiling : MonoBehaviour
         _runner.GetComponent<RunnerController>().Astar.TileDataList = TileDataArray; //타일 데이터 배열 설정
         _runner.GetComponent<RunnerController>().Astar.StartPos = new Vector2Int(runnerStartPoint[Random.Range(0, runnerStartPoint.Length)].x, runnerStartPoint[Random.Range(0, runnerStartPoint.Length)].y); //도망자 시작 위치 설정
         _runner.transform.position = Tiles[_runner.GetComponent<RunnerController>().Astar.StartPos.x, _runner.GetComponent<CharacterController>().Astar.StartPos.y].position + new Vector3(0, 0.5f, 0); //도망자 위치 설정
-        _runner.GetComponent<RunnerController>().Init(_chaser.GetComponent<ChaserController>(), FOW.Instance.viewAngle); //목표 위치 설정
+        _runner.GetComponent<RunnerController>().Init(_chaser.GetComponent<ChaserController>(), gameManager.fow.viewAngle); //목표 위치 설정
         _chaser.GetComponent<ChaserController>().Init(_runner.GetComponent<RunnerController>()); //목표 위치 설정
-        FOW.Instance.Characters[0] = _chaser.GetComponent<CharacterController>();
-        FOW.Instance.Characters[1] = _runner.GetComponent<CharacterController>();
+        gameManager.fow.Characters[0] = _chaser.GetComponent<CharacterController>();
+        gameManager.fow.Characters[1] = _runner.GetComponent<CharacterController>();
+        gameManager.RegisterObserver(_chaser.GetComponent<ChaserController>()); //추적자에 옵저버 등록
+        gameManager.RegisterObserver(_runner.GetComponent<RunnerController>()); //도망자에 옵저버 등록
+        
         
     }
 }

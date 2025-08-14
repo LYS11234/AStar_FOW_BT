@@ -38,6 +38,7 @@ public class ChaserController : CharacterController //추격 그만두는 경우
 
     public void Init(RunnerController _target)
     {
+        GetStart();
         target = _target;
         SetVisible();
         // 행동 트리 구성
@@ -176,16 +177,13 @@ public class ChaserController : CharacterController //추격 그만두는 경우
             isInSight = true; // 벽에 가려지지 않으면 시야 안
         }
         SetTargetVisible(isInSight); // 타겟의 가시성 설정
+
+        
     }
 
     protected void SetTargetVisible(bool visible)
     {
-        if (visible)
-        {
-            target.gameObject.layer = 10; // 타겟 레이어 설정
-            return;
-        }
-        target.SetVisible(); // 타겟을 보이지 않게 설정
+        NotifyObservers(ConstDataType.hasLineOfSight, target, visible); // 시야 상태 변경 알림
     }
 
     public void EndChase()

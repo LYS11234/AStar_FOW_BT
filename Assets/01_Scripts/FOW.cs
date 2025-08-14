@@ -1,6 +1,10 @@
-﻿using TMPro;
+﻿using System;
+using TMPro;
 using Unity.VisualScripting;
 using UnityEngine;
+using System.Collections.Generic;
+using UnityEngine.Rendering;
+
 
 [System.Serializable]
 public class FogOfWarStatus
@@ -17,25 +21,23 @@ public enum FogOfWarViewStatus
     Blocked
 }
 
-public class FOW : MonoBehaviour
+public class FOW : MonoBehaviour, IObserver
 {
-    public static FOW Instance;
 
-    private void Awake()
-    {
-        if (Instance == null)
-        {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
-    }
+    private GameManager gameManager;
 
     private FogOfWarStatus[,] fogOfWarStatuses = new FogOfWarStatus[0, 0];
     private Texture2D fogTexture;
     public Material fogMaterial;
+    [SerializeField]
+    private Shader fowShader;
+    private Vector4[] _revealerPosition;
+    private float[] _revealerRadii;
+    private RenderTexture totalTexture;
+    private RenderTexture[] visitedTexture;
+    private RenderTexture[] renderTextures;
+
+
     public int tileWidthCount;
     public int tileHeightCount;
 
@@ -47,24 +49,37 @@ public class FOW : MonoBehaviour
     private byte maxPlayers = 2;
     [SerializeField]
     private Transform[] characterTf;
+    protected Vector4[] _revealerPositionArray;
 
     public float viewAngle;
     private float viewRad;
     [SerializeField] private TMP_Dropdown dropdown;
     private byte nowPlayer;
     [SerializeField]
-    private Camera camera;
+    private Camera cam;
+
+    private const int MAX_REVEALERS = 100;
 
 
     public void Init(int _tileWidthCount, int _tileHeightCount)
     {
+        gameManager = GameManager.Instance;
         characterTf = new Transform[maxPlayers];
         tileWidthCount = _tileWidthCount;
         tileHeightCount = _tileHeightCount;
+        renderTextures = new RenderTexture[maxPlayers];
+        _revealerPosition = new Vector4[MAX_REVEALERS];
+        _revealerRadii = new float[MAX_REVEALERS];
+        totalTexture = new RenderTexture(ConstVariables.Resolution, ConstVariables.Resolution, 0, RenderTextureFormat.ARGB32);
+        visitedTexture = new RenderTexture[maxPlayers];
+        for (int i = 0; i < maxPlayers; i++)
+        {
+            visitedTexture[i] = new RenderTexture(ConstVariables.Resolution, ConstVariables.Resolution, 0, RenderTextureFormat.ARGB32);
+        }
         CreateFogTexture();
-        camera = Camera.main;
+        cam = Camera.main;
         fogOfWarStatuses = new FogOfWarStatus[tileWidthCount, tileHeightCount];
-
+        cam.depthTextureMode = DepthTextureMode.Depth;
         for (var i = 0; i < tileHeightCount; i++)
         {
             for (var j = 0; j < tileWidthCount; j++)
@@ -148,43 +163,100 @@ public class FOW : MonoBehaviour
             for (int x = 0; x < tileWidthCount; x++)
             {
                 int index = y * tileWidthCount + x; // 1D 인덱스로 변환
-                if (nowPlayer != 2)
+                if (nowPlayer == 2)
                 {
-                    if (fogOfWarStatuses[x, y].viewType != nowPlayer + 1 && fogOfWarStatuses[x, y].viewType != 3)
-                    {
-                        fogOfWarStatuses[x, y].status = FogOfWarViewStatus.Hidden;
-                    }
-
+                    continue;
                 }
-
-                switch (fogOfWarStatuses[x, y].status)
+                if (fogOfWarStatuses[x, y].viewType == nowPlayer + 1 || fogOfWarStatuses[x, y].viewType == 3)
                 {
-
-                    case FogOfWarViewStatus.Visited:
-                        {
-                            colors[index] = new Color32(0, 0, 0, 254); // 검은색, 반투명 (회색 느낌)
-
-                            break;
-                        }
-
-                    case FogOfWarViewStatus.Visible:
-                        {
-                            colors[index] = new Color32(0, 0, 0, 0); // 완전 투명
-                            visibleCount++;
-                            break;
-                        }
-
-                    default:
-                        {
-                            colors[index] = new Color32(0, 0, 0, 255); // 검은색, 완전 불투명
-                            break;
-                        }
+                    continue;
                 }
+                fogOfWarStatuses[x, y].status = FogOfWarViewStatus.Hidden;
+                visibleCount = SetVisiblity(fogOfWarStatuses[x, y].status, colors, index);
             }
         }
         fogTexture.SetPixels32(colors);
         fogTexture.Apply(); // 변경사항 GPU에 적용
     }
+
+    private int SetVisiblity(FogOfWarViewStatus status, Color32[] colors, int index)
+    {
+        int visibleCount = 0;
+        switch (status)
+        {
+
+            case FogOfWarViewStatus.Visited:
+                {
+                    colors[index] = new Color32(0, 0, 0, 254); // 검은색, 반투명 (회색 느낌)
+
+                    break;
+                }
+
+            case FogOfWarViewStatus.Visible:
+                {
+                    colors[index] = new Color32(0, 0, 0, 0); // 완전 투명
+                    visibleCount++;
+                    break;
+                }
+
+            default:
+                {
+                    colors[index] = new Color32(0, 0, 0, 255); // 검은색, 완전 불투명
+                    break;
+                }
+        }
+
+        return visibleCount;
+    }
+
+    #region Rendering Type FOW
+    public void OnNotify(byte eventType, object data)
+    {
+        switch (eventType)
+        {
+            case ConstDataType.fowSight:
+                {
+
+                    break;
+                }
+        }
+    }
+
+    public void OnNotify(byte eventType, object data0, object data1)
+    {
+        
+        switch (eventType)
+        {
+            case ConstDataType.fowSight:
+                {
+                    _revealerPosition[(byte)data0 - 8] = characterTf[(byte)data0 - 8].position; // 레이어 기준으로 구분
+                    renderTextures[(byte)data0 - 8] = (RenderTexture)data1; // 렌더 텍스쳐 설정
+                    SetRenderImage((byte)data0);
+                    break;
+                }
+            default:
+                {
+                    break;
+                }
+        }
+    }
+
+    protected void OnRenderImage(RenderTexture source, RenderTexture destination)
+    {
+        fogMaterial.SetMatrix("_CameraToWorldMatrix", cam.cameraToWorldMatrix);
+        Graphics.Blit(source, destination, fogMaterial);
+    }
+
+    protected void SetRenderImage(byte _layer)
+    {
+        fogMaterial.SetVectorArray("_RevealerPosition", _revealerPosition);
+        fogMaterial.SetFloat("_RevealerRadius", viewAngle);
+
+    }
+
+    
+    #endregion
+
 
     private void UpdateFogOfWarStatus(Vector2Int position, int sightRadius)
     {
@@ -192,10 +264,11 @@ public class FOW : MonoBehaviour
         {
             for (int y = 0; y < tileHeightCount; y++)
             {
-                if (fogOfWarStatuses[x, y].status == FogOfWarViewStatus.Visible)
+                if (fogOfWarStatuses[x, y].status != FogOfWarViewStatus.Visible)
                 {
-                    fogOfWarStatuses[x, y].status = FogOfWarViewStatus.Visited;
+                    continue;
                 }
+                fogOfWarStatuses[x, y].status = FogOfWarViewStatus.Visited;
             }
         }
         ShowUnitView(position, sightRadius, (byte)(nowPlayer + 1));
@@ -251,34 +324,24 @@ public class FOW : MonoBehaviour
                 }
 
                 byte currentNum = (byte)(playerNum - 1);
-                if (/*IsInViewAngle(position, targetTilePos, characterTf[nowPlayer]) &&*/
-                    HasLineOfSight(position, targetTilePos, characterTf[currentNum]))
+                if (!HasLineOfSight(position, targetTilePos, characterTf[currentNum]))
                 {
-
-
-                    if (fogOfWarStatuses[x, y].viewType == 0)
-                    {
-                        fogOfWarStatuses[x, y].viewType = playerNum;
-                    }
-                    else if (fogOfWarStatuses[x, y].viewType == 2 - currentNum)
-                    {
-                        fogOfWarStatuses[x, y].viewType = 3;
-                    }
-                    if (currentNum != nowPlayer && nowPlayer != 2)
-                    {
-                        continue;
-                    }
-                    // Line of Sight (LOS) 검사
-                    fogOfWarStatuses[x, y].status = FogOfWarViewStatus.Visible;
+                    continue;
                 }
-                //else if (nowPlayer == 2)
-                //{
-                //    if (HasLineOfSight(position, targetTilePos, characterTf[nowPlayer]))
-                //    {
-                //        // Line of Sight (LOS) 검사
-                //        fogOfWarStatuses[x, y].status = FogOfWarViewStatus.Visible;
-                //    }
-                //}
+                if (fogOfWarStatuses[x, y].viewType == 0)
+                {
+                    fogOfWarStatuses[x, y].viewType = playerNum;
+                }
+                else if (fogOfWarStatuses[x, y].viewType == 2 - currentNum)
+                {
+                    fogOfWarStatuses[x, y].viewType = 3;
+                }
+                if (currentNum != nowPlayer && nowPlayer != 2)
+                {
+                    continue;
+                }
+                // Line of Sight (LOS) 검사
+                fogOfWarStatuses[x, y].status = FogOfWarViewStatus.Visible;
 
 
 
@@ -315,12 +378,12 @@ public class FOW : MonoBehaviour
 
     Vector3 GetWorldPositionFromTile(Vector2Int tilePos)
     {
-        if (Tiling.Instance.IsUnityNull())
+        if (gameManager.tiling.IsUnityNull())
         {
             return Vector3.zero;
         }
 
-        if (Tiling.Instance.Tiles == null)
+        if (gameManager.tiling.Tiles == null)
         {
             return Vector3.zero;
         }
@@ -330,7 +393,7 @@ public class FOW : MonoBehaviour
             return Vector3.zero;
         }
 
-        if (tilePos.x >= Tiling.Instance.Tiles.GetLength(0))
+        if (tilePos.x >= gameManager.tiling.Tiles.GetLength(0))
         {
             return Vector3.zero;
         }
@@ -340,16 +403,18 @@ public class FOW : MonoBehaviour
             return Vector3.zero;
         }
 
-        if (tilePos.y >= Tiling.Instance.Tiles.GetLength(1))
+        if (tilePos.y >= gameManager.tiling.Tiles.GetLength(1))
         {
             return Vector3.zero;
         }
 
 
-        return Tiling.Instance.Tiles[tilePos.x, tilePos.y].position;
+        return gameManager.tiling.Tiles[tilePos.x, tilePos.y].position;
 
     }
 
+
+    #region Dropdown Event
     public void OnValueChange()
     {
         nowPlayer = (byte)dropdown.value;
@@ -377,27 +442,29 @@ public class FOW : MonoBehaviour
         {
             case 0:
                 {
-                    camera.cullingMask |= (1 << ChaserLayer);      // ChaserLayer 활성화
-                    camera.cullingMask &= ~(1 << RunnerLayer);     // RunnerLayer 비활성화
+                    cam.cullingMask |= (1 << ChaserLayer);      // ChaserLayer 활성화
+                    cam.cullingMask &= ~(1 << RunnerLayer);     // RunnerLayer 비활성화
                     Debug.Log("Chaser Layer 활성화");
                     break;
                 }
             case 1:
                 {
-                    camera.cullingMask |= (1 << RunnerLayer);      // RunnerLayer 활성화
-                    camera.cullingMask &= ~(1 << ChaserLayer);     // ChaserLayer 비활성화
+                    cam.cullingMask |= (1 << RunnerLayer);      // RunnerLayer 활성화
+                    cam.cullingMask &= ~(1 << ChaserLayer);     // ChaserLayer 비활성화
                     Debug.Log("Runner Layer 활성화");
                     break;
                 }
             default:
                 {
-                    camera.cullingMask |= (1 << RunnerLayer);      // RunnerLayer 활성화
-                    camera.cullingMask |= (1 << ChaserLayer);      // ChaserLayer 활성화
+                    cam.cullingMask |= (1 << RunnerLayer);      // RunnerLayer 활성화
+                    cam.cullingMask |= (1 << ChaserLayer);      // ChaserLayer 활성화
                     Debug.Log("모든 레이어 활성화");
                     break;
                 }
         }
     }
+
+    #endregion
 
     public void CheckDistance()
     {
