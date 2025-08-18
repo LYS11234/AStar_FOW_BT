@@ -6,6 +6,7 @@ using System.Linq;
 using Random = UnityEngine.Random;
 using static UnityEngine.GraphicsBuffer;
 using Unity.VisualScripting;
+using UnityEngine.UIElements;
 
 
 public class PriorityQueue<T> where T : IComparable<T>
@@ -276,14 +277,12 @@ public class CharacterController : MonoBehaviour, ISubject
     protected GameManager gameManager;
 
     #region Sight
-    protected Vector4 revealerPosition = new Vector4(); //시야 위치 배열
+    protected Vector2Int revealerPosition = new Vector2Int(); //시야 위치 배열
     [SerializeField]
     protected float revealerRad = 0; //시야 반지름 배열
 
-    [SerializeField]
-    protected Camera depthCamera; //뎁스 카메라
-    [SerializeField]
-    protected RenderTexture depthTexture; //뎁스 텍스처
+    protected Vector3 forward; //앞 방향 벡터
+    protected List<Vector2Int> visibleTiles = new List<Vector2Int>(); //시야에 보이는 타일 리스트
     #endregion
 
     protected void GetStart()
@@ -295,8 +294,6 @@ public class CharacterController : MonoBehaviour, ISubject
             Astar.Status = status;
             fogOfWar = gameManager.fow; //FOW 인스턴스 가져오기
             
-            depthTexture = new RenderTexture(ConstVariables.Resolution, ConstVariables.Resolution, 24, RenderTextureFormat.Depth); //뎁스 텍스처 생성
-            depthCamera.targetTexture = depthTexture; //뎁스 카메라의 타겟 텍스처 설정
         }
     }
     protected virtual void Update()
@@ -358,10 +355,77 @@ public class CharacterController : MonoBehaviour, ISubject
 
     public virtual void HasLineOfSight()
     {
-        revealerPosition = transform.position; //시야 위치 설정
-        revealerRad = sightDistance; //시야 반지름 설정
+        revealerPosition = Astar.CurrentNode.Position; //현재 노드 위치 설정
+        forward = transform.forward; //앞 방향 벡터 설정
+        var xRange = Enumerable.Range(revealerPosition.x - sightDistance, 2 * sightDistance + 1);
+        var yRange = Enumerable.Range(revealerPosition.y - sightDistance, 2 * sightDistance + 1);
+        var targetTiles = xRange.SelectMany(x => yRange.Select(y => new Vector2Int(x, y))); // 타겟 타일 리스트 생성
+
+        foreach (var targetTilePos in targetTiles)
+        {
+            CheckInSight(targetTilePos); // 시야에 보이는 타일 체크
+        }
+        NotifyObservers(ConstDataType.fowSight, layer, visibleTiles); //시야 업데이트 알림
+    }
+
+    private void CheckInSight(Vector2Int endTile)
+    {
+        visibleTiles.Clear(); //시야에 보이는 타일 리스트 초기화
+        Vector3 start = GetWorldPositionFromTile(revealerPosition) + Vector3.up * 0.5f;
+        Vector3 end = GetWorldPositionFromTile(endTile) + Vector3.up * 0.5f;
+        Vector3 dir = (end - start).normalized;
+        float dotProduct = Vector3.Dot(forward, dir); //앞 방향과 현재 방향의 내적 계산
+        float minDotProduct = Mathf.Cos(viewAngle * 0.5f * Mathf.Deg2Rad); //시야각의 코사인 값 계산
+        if (dotProduct < minDotProduct)
+        {
+            return;
+        }
+        RaycastHit hit;
+        if (Physics.Linecast(start, end, out hit, LayerMask.GetMask("Wall")))
+        {
+            return;
+        }
+        visibleTiles.Add(endTile); //시야에 보이는 타일 리스트에 추가
+    }
+
+
+    Vector3 GetWorldPositionFromTile(Vector2Int tilePos)
+    {
+        if (gameManager.tiling.IsUnityNull())
+        {
+            return Vector3.zero;
+        }
+
+        if (gameManager.tiling.Tiles == null)
+        {
+            return Vector3.zero;
+        }
+
+        if (tilePos.x < 0)
+        {
+            return Vector3.zero;
+        }
+
+        if (tilePos.x >= gameManager.tiling.Tiles.GetLength(0))
+        {
+            return Vector3.zero;
+        }
+
+        if (tilePos.y < 0)
+        {
+            return Vector3.zero;
+        }
+
+        if (tilePos.y >= gameManager.tiling.Tiles.GetLength(1))
+        {
+            return Vector3.zero;
+        }
+
+
+        return gameManager.tiling.Tiles[tilePos.x, tilePos.y].position;
 
     }
+
     public CharacterStatus GetStatus()
     {
         return status;
@@ -414,19 +478,20 @@ public class CharacterController : MonoBehaviour, ISubject
 
     private void SetTargetPos()
     {
-        if(movementCount < Astar.Path.Count)
+        if (movementCount < 1)
         {
-            
-            targetPos = Tiles[Astar.Path[movementCount].Position.x, Astar.Path[movementCount].Position.y].position +
-                    new Vector3(0, 0.5f, 0);
-            if (movementCount >= 1)
-            {
-                Astar.CurrentNode = Astar.Path[movementCount - 1]; //현재 노드 업데이트
-            }
+            return; //첫 번째 이동은 타겟 위치 설정을 하지 않음
         }
+        Astar.CurrentNode = Astar.Path[movementCount - 1]; //현재 노드 업데이트
+        if (movementCount >= Astar.Path.Count)
+        {
+            return; //경로의 끝에 도달하면 타겟 위치 설정을 하지 않음
 
-        NotifyObservers(ConstDataType.fowSight, layer, depthTexture);
+        }
+        targetPos = Tiles[Astar.Path[movementCount].Position.x, Astar.Path[movementCount].Position.y].position +
+                    new Vector3(0, 0.5f, 0);
         
+
     }
 
     protected void TurnTowards(Vector3 targetDirection)
@@ -496,7 +561,7 @@ public class CharacterController : MonoBehaviour, ISubject
 
     }
 
-    public void NotifyObservers(byte eventType, object data0, object data1)
+    public void NotifyObservers(byte eventType, object data0, object data1, object data2 = null)
     {
         switch (eventType)
         {

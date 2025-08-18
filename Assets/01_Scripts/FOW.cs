@@ -4,6 +4,7 @@ using Unity.VisualScripting;
 using UnityEngine;
 using System.Collections.Generic;
 using UnityEngine.Rendering;
+using System.Linq;
 
 
 [System.Serializable]
@@ -26,16 +27,11 @@ public class FOW : MonoBehaviour, IObserver
 
     private GameManager gameManager;
 
-    private FogOfWarStatus[,] fogOfWarStatuses = new FogOfWarStatus[0, 0];
+    public FogOfWarStatus[,] fogOfWarStatuses = new FogOfWarStatus[0, 0];
     private Texture2D fogTexture;
     public Material fogMaterial;
     [SerializeField]
     private Shader fowShader;
-    private Vector4[] _revealerPosition;
-    private float[] _revealerRadii;
-    private RenderTexture totalTexture;
-    private RenderTexture[] visitedTexture;
-    private RenderTexture[] renderTextures;
 
 
     public int tileWidthCount;
@@ -49,14 +45,16 @@ public class FOW : MonoBehaviour, IObserver
     private byte maxPlayers = 2;
     [SerializeField]
     private Transform[] characterTf;
-    protected Vector4[] _revealerPositionArray;
 
     public float viewAngle;
-    private float viewRad;
     [SerializeField] private TMP_Dropdown dropdown;
     private byte nowPlayer;
     [SerializeField]
     private Camera cam;
+
+    private List<FogOfWarStatus> p1VisibleList = new List<FogOfWarStatus>();
+    private List<FogOfWarStatus> p2VisibleList = new List<FogOfWarStatus>();
+
 
     private const int MAX_REVEALERS = 100;
 
@@ -67,15 +65,6 @@ public class FOW : MonoBehaviour, IObserver
         characterTf = new Transform[maxPlayers];
         tileWidthCount = _tileWidthCount;
         tileHeightCount = _tileHeightCount;
-        renderTextures = new RenderTexture[maxPlayers];
-        _revealerPosition = new Vector4[MAX_REVEALERS];
-        _revealerRadii = new float[MAX_REVEALERS];
-        totalTexture = new RenderTexture(ConstVariables.Resolution, ConstVariables.Resolution, 0, RenderTextureFormat.ARGB32);
-        visitedTexture = new RenderTexture[maxPlayers];
-        for (int i = 0; i < maxPlayers; i++)
-        {
-            visitedTexture[i] = new RenderTexture(ConstVariables.Resolution, ConstVariables.Resolution, 0, RenderTextureFormat.ARGB32);
-        }
         CreateFogTexture();
         cam = Camera.main;
         fogOfWarStatuses = new FogOfWarStatus[tileWidthCount, tileHeightCount];
@@ -92,7 +81,6 @@ public class FOW : MonoBehaviour, IObserver
 
         characterTf[0] = Characters[0].transform;
         characterTf[1] = Characters[1].transform;
-        viewRad = viewAngle * Mathf.Deg2Rad;
         UpdateFogTexture();
         OnValueChange();
     }
@@ -120,13 +108,13 @@ public class FOW : MonoBehaviour, IObserver
                     Vector2Int position = new Vector2Int(0, 0);
                     sightRadius = Characters[nowPlayer].GetSightDistance();
                     short count = 0;
-                    if (Characters[nowPlayer].GetMovementCount() > 0)
-                    {
-                        count = (short)(Characters[nowPlayer].GetMovementCount() - 1);
-                    }
-
                     position = Characters[nowPlayer].Astar.CurrentNode.Position;
                     UpdateFogOfWarStatus(position, sightRadius);
+                    if (Characters[nowPlayer].GetMovementCount() <= 0)
+                    {
+                        break;
+                    }
+                    count = (short)(Characters[nowPlayer].GetMovementCount() - 1);
                     break;
                 }
         }
@@ -158,6 +146,13 @@ public class FOW : MonoBehaviour, IObserver
     {
         Color32[] colors = new Color32[tileWidthCount * tileHeightCount];
         int visibleCount = 0;
+        var xRange = Enumerable.Range(0, tileWidthCount);
+        var yRange = Enumerable.Range(0, tileHeightCount);
+        var tiles = xRange.SelectMany(x => yRange.Select(y => new Vector2Int(x, y)));
+        foreach (var tile in tiles)
+        {
+
+        }
         for (int y = 0; y < tileHeightCount; y++)
         {
             for (int x = 0; x < tileWidthCount; x++)
@@ -222,16 +217,16 @@ public class FOW : MonoBehaviour, IObserver
         }
     }
 
-    public void OnNotify(byte eventType, object data0, object data1)
+    public void OnNotify(byte eventType, object data0, object data1, object data2 = null)
     {
         
         switch (eventType)
         {
             case ConstDataType.fowSight:
                 {
-                    _revealerPosition[(byte)data0 - 8] = characterTf[(byte)data0 - 8].position; // 레이어 기준으로 구분
-                    renderTextures[(byte)data0 - 8] = (RenderTexture)data1; // 렌더 텍스쳐 설정
-                    SetRenderImage((byte)data0);
+                    List<Vector2Int> tiles = data1 as List<Vector2Int>;
+
+
                     break;
                 }
             default:
@@ -241,19 +236,11 @@ public class FOW : MonoBehaviour, IObserver
         }
     }
 
-    protected void OnRenderImage(RenderTexture source, RenderTexture destination)
+
+    private void CheckVisibleTiles(List<Vector2Int> tiles, byte layer)
     {
-        fogMaterial.SetMatrix("_CameraToWorldMatrix", cam.cameraToWorldMatrix);
-        Graphics.Blit(source, destination, fogMaterial);
+        
     }
-
-    protected void SetRenderImage(byte _layer)
-    {
-        fogMaterial.SetVectorArray("_RevealerPosition", _revealerPosition);
-        fogMaterial.SetFloat("_RevealerRadius", viewAngle);
-
-    }
-
     
     #endregion
 
@@ -359,8 +346,8 @@ public class FOW : MonoBehaviour, IObserver
         Vector3 direction = endWorldPos - startWorldPos;
         direction.Normalize();
 
-        float dotProduct = Vector3.Dot(nowCharacterTf.forward, direction);
-        float minDotProduct = Mathf.Cos(viewAngle * 0.5f * Mathf.Deg2Rad);
+        float dotProduct = Vector3.Dot(nowCharacterTf.forward, direction); // 현재 캐릭터의 전방 방향과 타겟 방향의 내적 계산
+        float minDotProduct = Mathf.Cos(viewAngle * 0.5f * Mathf.Deg2Rad); // 시야각의 절반을 라디안으로 변환하여 최소 내적값 계산
         if (dotProduct < minDotProduct)
         {
             return false;

@@ -19,8 +19,9 @@ public class ChaserController : CharacterController //추격 그만두는 경우
     protected override void Update()
     {
         base.Update();
-        
-        
+        HasLineOfSight(); // 타겟과의 시야 확인
+
+
     }
 
 
