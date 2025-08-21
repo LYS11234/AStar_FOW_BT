@@ -28,6 +28,7 @@ public class FOW : MonoBehaviour, IObserver
     private GameManager gameManager;
 
     public FogOfWarStatus[,] fogOfWarStatuses = new FogOfWarStatus[0, 0];
+    [SerializeField]
     private Texture2D fogTexture;
     public Material fogMaterial;
     [SerializeField]
@@ -37,8 +38,8 @@ public class FOW : MonoBehaviour, IObserver
     public int tileWidthCount;
     public int tileHeightCount;
 
-    private const int RunnerLayer = 8;
-    private const int ChaserLayer = 9;
+    private const int RunnerLayer = 9;
+    private const int ChaserLayer = 8;
     private const int VisibleLayer = 10;
 
     public CharacterController[] Characters;
@@ -48,19 +49,22 @@ public class FOW : MonoBehaviour, IObserver
 
     public float viewAngle;
     [SerializeField] private TMP_Dropdown dropdown;
+    [SerializeField]
     private byte nowPlayer;
     [SerializeField]
     private Camera cam;
 
-    private List<FogOfWarStatus> p1VisibleList = new List<FogOfWarStatus>();
-    private List<FogOfWarStatus> p2VisibleList = new List<FogOfWarStatus>();
-
-
+    [SerializeField]
+    private List<Vector2Int>[] visitedList;
+    // 각 플레이어가 방문한 타일 리스트
+    [SerializeField]
+    private List<Vector2Int>[] visibleLists;
+    Color32[] colors;
     private const int MAX_REVEALERS = 100;
-
 
     public void Init(int _tileWidthCount, int _tileHeightCount)
     {
+       
         gameManager = GameManager.Instance;
         characterTf = new Transform[maxPlayers];
         tileWidthCount = _tileWidthCount;
@@ -68,71 +72,38 @@ public class FOW : MonoBehaviour, IObserver
         CreateFogTexture();
         cam = Camera.main;
         fogOfWarStatuses = new FogOfWarStatus[tileWidthCount, tileHeightCount];
+        colors = new Color32[tileWidthCount * tileHeightCount];
         cam.depthTextureMode = DepthTextureMode.Depth;
-        for (var i = 0; i < tileHeightCount; i++)
+        visitedList = new List<Vector2Int>[maxPlayers];
+        visibleLists = new List<Vector2Int>[maxPlayers];
+        for (int i = 0; i < maxPlayers; i++)
         {
-            for (var j = 0; j < tileWidthCount; j++)
-            {
-                fogOfWarStatuses[j, i] = new FogOfWarStatus();
-
-                fogOfWarStatuses[j, i].status = FogOfWarViewStatus.Hidden;
-            }
+            visitedList[i] = new List<Vector2Int>();
+            visibleLists[i] = new List<Vector2Int>();
         }
+
+        ResetFog();
 
         characterTf[0] = Characters[0].transform;
         characterTf[1] = Characters[1].transform;
-        UpdateFogTexture();
         OnValueChange();
     }
 
-    private void LateUpdate()
-    {
-        ShowFOWView();
-    }
-
-
-
-    private void ShowFOWView()
-    {
-
-        switch (nowPlayer)
-        {
-            case 2:
-                {
-                    ShowAllUnitView();
-                    return;
-                }
-            default:
-                {
-                    int sightRadius = 0;
-                    Vector2Int position = new Vector2Int(0, 0);
-                    sightRadius = Characters[nowPlayer].GetSightDistance();
-                    short count = 0;
-                    position = Characters[nowPlayer].Astar.CurrentNode.Position;
-                    UpdateFogOfWarStatus(position, sightRadius);
-                    if (Characters[nowPlayer].GetMovementCount() <= 0)
-                    {
-                        break;
-                    }
-                    count = (short)(Characters[nowPlayer].GetMovementCount() - 1);
-                    break;
-                }
-        }
-
-    }
     private void CreateFogTexture()
     {
         fogTexture = new Texture2D(tileWidthCount, tileHeightCount, TextureFormat.Alpha8, false);
+        
         fogTexture.filterMode = FilterMode.Point;
         fogTexture.wrapMode = TextureWrapMode.Clamp;
-
-        Color32[] initialColors = new Color32[tileWidthCount * tileHeightCount];
-        for (int i = 0; i < initialColors.Length; i++)
+        if(colors.IsUnityNull())
         {
-            initialColors[i] = new Color32(0, 0, 0, 255);
+            colors = new Color32[tileWidthCount * tileHeightCount];
         }
-        fogTexture.SetPixels32(initialColors);
-        fogTexture.Apply();
+        for (int i = 0; i < colors.Length; i++)
+        {
+            colors[i] = new Color32(0, 0, 0, 255);
+        }
+        
         if (fogMaterial != null)
         {
             fogMaterial.mainTexture = fogTexture;
@@ -140,69 +111,10 @@ public class FOW : MonoBehaviour, IObserver
             fogMaterial.mainTextureOffset = new Vector2(1, 1);
 
         }
-    }
-
-    private void UpdateFogTexture()
-    {
-        Color32[] colors = new Color32[tileWidthCount * tileHeightCount];
-        int visibleCount = 0;
-        var xRange = Enumerable.Range(0, tileWidthCount);
-        var yRange = Enumerable.Range(0, tileHeightCount);
-        var tiles = xRange.SelectMany(x => yRange.Select(y => new Vector2Int(x, y)));
-        foreach (var tile in tiles)
-        {
-
-        }
-        for (int y = 0; y < tileHeightCount; y++)
-        {
-            for (int x = 0; x < tileWidthCount; x++)
-            {
-                int index = y * tileWidthCount + x; // 1D 인덱스로 변환
-                if (nowPlayer == 2)
-                {
-                    continue;
-                }
-                if (fogOfWarStatuses[x, y].viewType == nowPlayer + 1 || fogOfWarStatuses[x, y].viewType == 3)
-                {
-                    continue;
-                }
-                fogOfWarStatuses[x, y].status = FogOfWarViewStatus.Hidden;
-                visibleCount = SetVisiblity(fogOfWarStatuses[x, y].status, colors, index);
-            }
-        }
         fogTexture.SetPixels32(colors);
-        fogTexture.Apply(); // 변경사항 GPU에 적용
+        fogTexture.Apply();
     }
 
-    private int SetVisiblity(FogOfWarViewStatus status, Color32[] colors, int index)
-    {
-        int visibleCount = 0;
-        switch (status)
-        {
-
-            case FogOfWarViewStatus.Visited:
-                {
-                    colors[index] = new Color32(0, 0, 0, 254); // 검은색, 반투명 (회색 느낌)
-
-                    break;
-                }
-
-            case FogOfWarViewStatus.Visible:
-                {
-                    colors[index] = new Color32(0, 0, 0, 0); // 완전 투명
-                    visibleCount++;
-                    break;
-                }
-
-            default:
-                {
-                    colors[index] = new Color32(0, 0, 0, 255); // 검은색, 완전 불투명
-                    break;
-                }
-        }
-
-        return visibleCount;
-    }
 
     #region Rendering Type FOW
     public void OnNotify(byte eventType, object data)
@@ -225,7 +137,7 @@ public class FOW : MonoBehaviour, IObserver
             case ConstDataType.fowSight:
                 {
                     List<Vector2Int> tiles = data1 as List<Vector2Int>;
-
+                    AddVisibleTiles(tiles, (byte)data0);
 
                     break;
                 }
@@ -237,194 +149,117 @@ public class FOW : MonoBehaviour, IObserver
     }
 
 
-    private void CheckVisibleTiles(List<Vector2Int> tiles, byte layer)
+    private void AddVisibleTiles(List<Vector2Int> tiles, byte layer)
     {
+        visibleLists[layer - 8].Clear();
+        for (int i = 0; i < tiles.Count; i++)
+        {
+            CheckVisibleTiles(tiles[i], layer);
+        }
+        visibleLists[layer - 8].AddRange(tiles);
+        CheckVisiblity();
+    }
+
+    private void CheckVisibleTiles(Vector2Int tile, byte layer)
+    {
+        byte currenPlayer = (byte)(layer - 8);
+        if (visitedList[currenPlayer].Contains(tile))
+        {
+            return;
+        }
+        visitedList[currenPlayer].Add(tile);
+        
+        
         
     }
     
+    private void CheckVisiblity()
+    {
+        if(visitedList.IsUnityNull())
+        {
+            return;
+        }
+        switch (nowPlayer)
+        {
+            case 2:
+                {
+                    UpdateFogTexture();
+                    break;
+                }
+            default:
+                {
+                    UpdateFogTexture(visitedList[nowPlayer]);
+                    break;
+                }
+        }
+        
+    }
+
+    private void UpdateFogTexture(List<Vector2Int> _visitedTileList = null)
+    {
+        List<Vector2Int> visitedTileList = _visitedTileList;
+        List<Vector2Int> visibles = new List<Vector2Int>();
+        switch(nowPlayer)
+        {            
+            case 0:
+                {
+                    visitedTileList = visitedList[0];
+                    visibles = visibleLists[0];
+                    break;
+                }
+            case 1:
+                {
+                    visitedTileList = visitedList[1];
+                    visibles = visibleLists[1];
+                    break;
+                }
+            default:
+                {
+                    visitedTileList = new List<Vector2Int>();
+                    visitedTileList.AddRange(visitedList[0]);
+                    visitedTileList.AddRange(visitedList[1]);
+                    visibles.AddRange(visibleLists[0]);
+                    visibles.AddRange(visibleLists[1]);
+                    break;
+                }
+        }
+        for(int i = 0; i < visitedTileList.Count; i++)
+        {
+            Vector2Int tile = visitedTileList[i];
+            if (tile.x < 0 || tile.x >= tileWidthCount || tile.y < 0 || tile.y >= tileHeightCount)
+            {
+                continue;
+            }
+            int index = tile.y * tileWidthCount + tile.x; // 1D 인덱스로 변환
+            colors[index] = new Color32(0, 0, 0, 254); // 검은색, 반투명 (회색 느낌)
+        }
+        
+        for (int i = 0; i < visibles.Count; i++)
+        {
+            Vector2Int tile = visibles[i];
+            if (tile.x < 0 || tile.x >= tileWidthCount || tile.y < 0 || tile.y >= tileHeightCount)
+            {
+                continue;
+            }
+            int index = tile.y * tileWidthCount + tile.x; // 1D 인덱스로 변환
+            colors[index] = new Color32(0, 0, 0, 0); // 투명 (시야가 보이는 부분은 완전히 투명하게 처리)
+        }
+        fogTexture.SetPixels32(colors);
+        fogTexture.Apply(); // 변경사항 GPU에 적용
+        
+    }
     #endregion
 
 
-    private void UpdateFogOfWarStatus(Vector2Int position, int sightRadius)
-    {
-        for (int x = 0; x < tileWidthCount; x++)
-        {
-            for (int y = 0; y < tileHeightCount; y++)
-            {
-                if (fogOfWarStatuses[x, y].status != FogOfWarViewStatus.Visible)
-                {
-                    continue;
-                }
-                fogOfWarStatuses[x, y].status = FogOfWarViewStatus.Visited;
-            }
-        }
-        ShowUnitView(position, sightRadius, (byte)(nowPlayer + 1));
-        ShowUnitView(Characters[1 - nowPlayer].Astar.CurrentNode.Position, sightRadius, (byte)(2 - nowPlayer));
-        UpdateFogTexture();
-    }
 
-    private void ShowAllUnitView()
-    {
-        for (int x = 0; x < tileWidthCount; x++)
-        {
-            for (int y = 0; y < tileHeightCount; y++)
-            {
-                if (fogOfWarStatuses[x, y].status != FogOfWarViewStatus.Visible)
-                {
-                    continue;
-                }
-
-                fogOfWarStatuses[x, y].status = FogOfWarViewStatus.Visited;
-            }
-        }
-
-        for (int i = 0; i < Characters.Length; i++)
-        {
-
-
-            Vector2Int position = Characters[i].Astar.CurrentNode.Position;
-            int sightRadius = Characters[i].GetSightDistance();
-            ShowUnitView(position, sightRadius, (byte)(i + 1));
-        }
-
-        UpdateFogTexture();
-
-    }
-
-    private void ShowUnitView(Vector2Int position, int sightRadius, byte playerNum)
-    {
-        for (int x = position.x - sightRadius; x <= position.x + sightRadius; x++)
-        {
-            for (int y = position.y - sightRadius; y <= position.y + sightRadius; y++)
-            {
-                // 맵 범위 체크
-                if (x < 0 || x >= tileWidthCount || y < 0 || y >= tileHeightCount)
-                    continue;
-
-                Vector2Int targetTilePos = new Vector2Int(x, y);
-                float distance = Vector2Int.Distance(position, targetTilePos);
-
-                if (distance > sightRadius)
-                {
-                    continue;
-
-                }
-
-                byte currentNum = (byte)(playerNum - 1);
-                if (!HasLineOfSight(position, targetTilePos, characterTf[currentNum]))
-                {
-                    continue;
-                }
-                if (fogOfWarStatuses[x, y].viewType == 0)
-                {
-                    fogOfWarStatuses[x, y].viewType = playerNum;
-                }
-                else if (fogOfWarStatuses[x, y].viewType == 2 - currentNum)
-                {
-                    fogOfWarStatuses[x, y].viewType = 3;
-                }
-                if (currentNum != nowPlayer && nowPlayer != 2)
-                {
-                    continue;
-                }
-                // Line of Sight (LOS) 검사
-                fogOfWarStatuses[x, y].status = FogOfWarViewStatus.Visible;
-
-
-
-
-            }
-        }
-    }
-
-
-    private bool HasLineOfSight(Vector2Int startTile, Vector2Int endTile, Transform nowCharacterTf)
-    {
-        Vector3 startWorldPos = GetWorldPositionFromTile(startTile) + Vector3.up * 0.5f; // 눈높이
-        Vector3 endWorldPos = GetWorldPositionFromTile(endTile) + Vector3.up * 0.5f; // 타일 중심 약간 위
-
-        Vector3 direction = endWorldPos - startWorldPos;
-        direction.Normalize();
-
-        float dotProduct = Vector3.Dot(nowCharacterTf.forward, direction); // 현재 캐릭터의 전방 방향과 타겟 방향의 내적 계산
-        float minDotProduct = Mathf.Cos(viewAngle * 0.5f * Mathf.Deg2Rad); // 시야각의 절반을 라디안으로 변환하여 최소 내적값 계산
-        if (dotProduct < minDotProduct)
-        {
-            return false;
-        }
-
-
-        RaycastHit hit;
-        if (Physics.Linecast(startWorldPos, endWorldPos, out hit, LayerMask.GetMask("Wall")))
-        {
-            return false;
-        }
-        return true;
-    }
-
-
-    Vector3 GetWorldPositionFromTile(Vector2Int tilePos)
-    {
-        if (gameManager.tiling.IsUnityNull())
-        {
-            return Vector3.zero;
-        }
-
-        if (gameManager.tiling.Tiles == null)
-        {
-            return Vector3.zero;
-        }
-
-        if (tilePos.x < 0)
-        {
-            return Vector3.zero;
-        }
-
-        if (tilePos.x >= gameManager.tiling.Tiles.GetLength(0))
-        {
-            return Vector3.zero;
-        }
-
-        if (tilePos.y < 0)
-        {
-            return Vector3.zero;
-        }
-
-        if (tilePos.y >= gameManager.tiling.Tiles.GetLength(1))
-        {
-            return Vector3.zero;
-        }
-
-
-        return gameManager.tiling.Tiles[tilePos.x, tilePos.y].position;
-
-    }
 
 
     #region Dropdown Event
     public void OnValueChange()
     {
         nowPlayer = (byte)dropdown.value;
-        for (int x = 0; x < fogOfWarStatuses.GetLength(0); x++)
-        {
-            for (int y = 0; y < fogOfWarStatuses.GetLength(1); y++)
-            {
-                if (fogOfWarStatuses[x, y].viewType == nowPlayer + 1 || fogOfWarStatuses[x, y].viewType == 3)
-                {
-                    fogOfWarStatuses[x, y].status = FogOfWarViewStatus.Visited;
-                    continue;
-                }
+        ResetFog();
 
-                if (fogOfWarStatuses[x, y].viewType > 0 && nowPlayer == 2)
-                {
-                    fogOfWarStatuses[x, y].status = FogOfWarViewStatus.Visited;
-                    continue;
-                }
-                fogOfWarStatuses[x, y].status = FogOfWarViewStatus.Hidden;
-            }
-        }
-
-        
         switch (nowPlayer)
         {
             case 0:
@@ -453,20 +288,15 @@ public class FOW : MonoBehaviour, IObserver
 
     #endregion
 
-    public void CheckDistance()
+    private void ResetFog()
     {
-        if (nowPlayer >= 2)
+        var xRange = Enumerable.Range(0, tileWidthCount);
+        var yRange = Enumerable.Range(0, tileHeightCount);
+        var targetTiles = xRange.SelectMany(x => yRange.Select(y => new Vector2Int(x, y))); // 타겟 타일 리스트 생성
+
+        for (int i = 0; i < colors.Length; i++)
         {
-            return;
-        }
-        Vector2Int position = Characters[1 - nowPlayer].Astar.CurrentNode.Position;
-        if (fogOfWarStatuses[position.x, position.y].status != FogOfWarViewStatus.Visible)
-        {
-            Characters[1 - nowPlayer].SetVisible();
-        }
-        else
-        {
-            Characters[1 - nowPlayer].gameObject.layer = VisibleLayer;
+            colors[i] = new Color32(0, 0, 0, 255); // 초기화
         }
     }
 }

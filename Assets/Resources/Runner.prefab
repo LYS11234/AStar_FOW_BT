@@ -123,13 +123,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   movementCount: 0
-  sightDistance: 4
+  sightDistance: 3
+  viewAngle: 100
   status: 0
   targetPos: {x: 0, y: 0, z: 0}
   isInSight: 0
   isActioning: 0
   layer: 9
   revealerRad: 0
+  visibleTiles: []
+  path: []
   firstRunTurn: 0
   isRunning: 0
   isInitialTurnStarted: 0

@@ -9,114 +9,7 @@ using Unity.VisualScripting;
 using UnityEngine.UIElements;
 
 
-public class PriorityQueue<T> where T : IComparable<T>
-{
-    private T[] data;
-    public int Count { get; private set; }
-    public int MaxCount { get; private set; }
 
-    public PriorityQueue()
-    {
-        MaxCount = 1;
-        
-        Count = 0;
-        data = new T[MaxCount];
-    }
-    public PriorityQueue(int maxCount = int.MaxValue)
-    {
-        MaxCount = maxCount;
-        Count = 0;
-        data = new T[MaxCount];
-    }
-
-    private void Expand()
-    {
-        MaxCount *= 2;
-        T[] newData = new T[MaxCount];
-        Array.Copy(data, newData, Count);
-        data = newData;
-    }
-
-    private void Swap(ref T left, ref T right)
-    {
-        T temp = left;
-        left = right;
-        right = temp;
-    }
-
-    public void Enqueue(T item)
-    {
-        if (Count == MaxCount)
-        {
-            Expand();
-        }
-        data[Count] = item; // 새 아이템을 배열의 끝에 추가
-        Count++;
-        
-        int index = Count - 1;
-        while (index > 0)
-        {
-            int parentIndex = (index - 1) / 2;
-            if (data[index].CompareTo(data[parentIndex]) > 0)
-            {
-                break; // 부모 노드가 더 크면 종료
-            }
-            Swap(ref data[index], ref data[parentIndex]);
-            index = parentIndex;
-        }
-    }
-    public T Dequeue() // 큐에서 가장 작은 요소를 제거하고 반환합니다.
-    {
-        if (Count == 0)
-        {
-            throw new InvalidOperationException("Queue is empty");
-        }
-        T result = data[0];
-        Count--;
-        data[0] = data[Count];
-        data[Count] = default(T); // 마지막 요소를 기본값으로 설정
-        int index = 0;
-        while (index < Count)
-        {
-            int leftChildIndex = index * 2 + 1;
-            int rightChildIndex = index * 2 + 2;
-            
-            int next = index; // 현재 노드 인덱스
-            if (leftChildIndex < Count && data[next].CompareTo(data[leftChildIndex]) > 0)
-            {
-                next = leftChildIndex; // 왼쪽 자식이 더 크면 왼쪽 자식 인덱스로 설정
-            }
-            if (rightChildIndex < Count && data[next].CompareTo(data[rightChildIndex]) > 0)
-            {
-                next = rightChildIndex; // 오른쪽 자식이 더 크면 오른쪽 자식 인덱스로 설정
-            }
-            if (index == next)
-            {
-                break; // 자식 노드가 없으면 종료
-            }
-            Swap(ref data[index], ref data[next]);
-            index = next;
-        }
-        return result;
-    }
-
-    public T Peek()
-    {
-        if (Count == 0)
-        {
-            throw new InvalidOperationException("Queue is empty");
-        }
-        return data[0];
-    }
-
-   
-
-    public void Clear()
-    {
-        Count = 0; // 큐를 비우기 위해 Count를 0으로 설정
-        Array.Clear(data, 0, data.Length); // 데이터 배열을 초기화
-    }
-}
 
 
 
@@ -127,109 +20,7 @@ public enum CharacterStatus
     Turning
 }
 
-public class AStar
-{
-    #region A* Algorithm Variables
-    [Header("A* Algorithm Variables")]
-    public PriorityQueue<TileData> OpenList = new(); //열린 타일 리스트
-    public HashSet<TileData> ClosedList = new HashSet<TileData>(); //닫힌 타일 리스트
-    public List<TileData> Path = new List<TileData>(); //경로 타일 리스트
 
-    public TileData[,] TileDataList; //타일 데이터 리스트
-    public TileData CurrentNode; //현재 노드
-    public Vector2Int Destination; //목표 위치
-    public Vector2Int StartPos;
-    #endregion
-
-    public CharacterStatus Status;
-
-    public void AStarAlgorithm()
-    {
-
-        if (OpenList.Count == 0)
-        {
-            Debug.Log("No path found");
-            return; //열린 타일이 없으면 경로를 찾을 수 없음
-        }
-        while (OpenList.Count > 0)
-        {
-            
-
-            TileData currentNode = OpenList.Dequeue(); //선택한 노드를 열린 타일 리스트에서 제거
-            if (ClosedList.Contains(currentNode))
-            {
-                continue; //현재 노드가 닫힌 타일 리스트에 있으면 무시
-            }
-            ClosedList.Add(currentNode); //현재 노드를 닫힌 타일 리스트에 추가
-            if (currentNode.Position == Destination)
-            {
-                Path.Add(currentNode); //목표 위치에 도달하면 경로에 추가
-                break; //경로 찾기 종료
-            }
-            if (currentNode.Position.x > 0)
-            {
-                CheckNode(currentNode.Position, new Vector2Int(-1, 0)); //왼쪽 타일 체크
-            }
-            if (currentNode.Position.x < TileDataList.GetLength(0) - 1)
-            {
-                CheckNode(currentNode.Position, new Vector2Int(1, 0)); //오른쪽 타일 체크
-            }
-            if (currentNode.Position.y > 0)
-            {
-                CheckNode(currentNode.Position, new Vector2Int(0, -1)); //아래 타일 체크
-            }
-            if (currentNode.Position.y < TileDataList.GetLength(1) - 1)
-            {
-                CheckNode(currentNode.Position, new Vector2Int(0, 1)); //위 타일 체크
-            }
-
-        }
-
-        ConfirmPath(); //경로 확인 및 설정
-
-    }
-
-    private void CheckNode(Vector2Int position, Vector2Int checkPos)
-    {
-        if (TileDataList[position.x + checkPos.x, position.y + checkPos.y].IsBlock)
-        {
-            return; //이동 불가능한 타일이면 무시
-        }
-        if (ClosedList.Contains(TileDataList[position.x + checkPos.x, position.y + checkPos.y]))
-        {
-            return; //이미 닫힌 타일이면 무시
-        }
-        TileData newNode = TileDataList[position.x + checkPos.x, position.y + checkPos.y];
-        newNode.GValue = TileDataList[position.x, position.y].GValue + 1; //G값 설정
-        newNode.HValue = Mathf.Abs((Destination.x - newNode.Position.x)) + Mathf.Abs((Destination.y - newNode.Position.y));//H값 맨해튼 거리로 설정
-        newNode.FValue = newNode.GValue + newNode.HValue; //F값 설정
-        newNode.Parent = TileDataList[position.x, position.y]; //부모 노드 설정
-        OpenList.Enqueue(newNode); //열린 타일 리스트에 추가
-    }
-
-
-    protected void ConfirmPath()
-    {
-        if (Path.Count == 0)
-        {
-            Debug.LogError("No path found");
-            return; //경로가 없으면 종료
-        }
-        CurrentNode = Path[Path.Count - 1]; //경로의 마지막 노드
-        Path.RemoveRange(0, Path.Count - 1); //경로 초기화
-        Path.Add(CurrentNode); //현재 노드를 경로에 추가
-        while (CurrentNode.Parent != null)
-        {
-            
-            Path.Add(CurrentNode.Parent); //부모 노드를 경로에 추가
-            CurrentNode = CurrentNode.Parent; //현재 노드를 부모 노드로 업데이트
-        }
-
-        Path.Reverse(); //경로를 역순으로 변경
-
-    }
-
-}
 
 public class CharacterController : MonoBehaviour, ISubject
 {
@@ -249,6 +40,7 @@ public class CharacterController : MonoBehaviour, ISubject
     public Transform[,] Tiles; //타일 배열
     [SerializeField]
     protected int sightDistance = 5;
+    [SerializeField]
     protected float viewAngle; //시야각
     private FOW fogOfWar;
     private Vector3 destination;
@@ -282,7 +74,13 @@ public class CharacterController : MonoBehaviour, ISubject
     protected float revealerRad = 0; //시야 반지름 배열
 
     protected Vector3 forward; //앞 방향 벡터
+    [SerializeField]    
     protected List<Vector2Int> visibleTiles = new List<Vector2Int>(); //시야에 보이는 타일 리스트
+    #endregion
+
+
+    #region Debug
+    public List<Vector2Int> path = new List<Vector2Int>(); //디버그용 경로 리스트
     #endregion
 
     protected void GetStart()
@@ -308,30 +106,11 @@ public class CharacterController : MonoBehaviour, ISubject
        
         Random.InitState((int)DateTime.Now.Ticks); //랜덤 시드 초기화
         movementCount = 0; //이동 카운트 초기화
-        Astar.Destination = new Vector2Int(Random.Range(0, gameManager.tiling.Tiles.GetLength(0) - 1), Random.Range(0, gameManager.tiling.Tiles.GetLength(1) - 1));
-        Astar.Path.Clear(); //경로 리스트 초기화
-        Astar.OpenList.Clear(); //열린 타일 리스트 초기화
-        Astar.ClosedList.Clear(); //닫힌 타일 리스트 초기화
-        destination = Tiles[Astar.Destination.x, Astar.Destination.y].position;
-        for (int i = 0; i < Astar.TileDataList.GetLength(0); i++)
-        {
-            for (int j = 0; j < Astar.TileDataList.GetLength(1); j++)
-            {
-                Astar.TileDataList[i, j].GValue = 0; //G값 초기화
-                Astar.TileDataList[i, j].HValue = 0; //H값 초기화
-                Astar.TileDataList[i, j].FValue = 0; //F값 초기화
-                Astar.TileDataList[i, j].Parent = null; //부모 노드 초기화
-            }
-        }
-
-        while (Astar.TileDataList[Astar.Destination.x, Astar.Destination.y].IsBlock)
-        {
-            Astar.Destination = new Vector2Int(Random.Range(0, gameManager.tiling.Tiles.GetLength(0) - 1), Random.Range(0, gameManager.tiling.Tiles.GetLength(1) - 1));
-        }
-        Astar.OpenList.Enqueue(Astar.TileDataList[Astar.StartPos.x, Astar.StartPos.y]);
+        Astar.FindPath(); //A* 알고리즘을 사용하여 경로 찾기
         isStart = true; //경로 찾기 시작 플래그 설정
-        Astar.AStarAlgorithm(); //경로 찾기 시작
         status = CharacterStatus.Moving;
+        path = Astar.Path.Select(node => node.Position).ToList(); //경로 리스트 업데이트
+
     }
 
 
@@ -355,12 +134,12 @@ public class CharacterController : MonoBehaviour, ISubject
 
     public virtual void HasLineOfSight()
     {
+        visibleTiles.Clear(); //시야에 보이는 타일 리스트 초기화
         revealerPosition = Astar.CurrentNode.Position; //현재 노드 위치 설정
         forward = transform.forward; //앞 방향 벡터 설정
-        var xRange = Enumerable.Range(revealerPosition.x - sightDistance, 2 * sightDistance + 1);
+        var xRange = Enumerable.Range(revealerPosition.x - sightDistance, 2 * sightDistance + 1); // 
         var yRange = Enumerable.Range(revealerPosition.y - sightDistance, 2 * sightDistance + 1);
         var targetTiles = xRange.SelectMany(x => yRange.Select(y => new Vector2Int(x, y))); // 타겟 타일 리스트 생성
-
         foreach (var targetTilePos in targetTiles)
         {
             CheckInSight(targetTilePos); // 시야에 보이는 타일 체크
@@ -370,10 +149,10 @@ public class CharacterController : MonoBehaviour, ISubject
 
     private void CheckInSight(Vector2Int endTile)
     {
-        visibleTiles.Clear(); //시야에 보이는 타일 리스트 초기화
+        
         Vector3 start = GetWorldPositionFromTile(revealerPosition) + Vector3.up * 0.5f;
         Vector3 end = GetWorldPositionFromTile(endTile) + Vector3.up * 0.5f;
-        Vector3 dir = (end - start).normalized;
+        Vector3 dir = (end - start).normalized; // 
         float dotProduct = Vector3.Dot(forward, dir); //앞 방향과 현재 방향의 내적 계산
         float minDotProduct = Mathf.Cos(viewAngle * 0.5f * Mathf.Deg2Rad); //시야각의 코사인 값 계산
         if (dotProduct < minDotProduct)
@@ -478,19 +257,21 @@ public class CharacterController : MonoBehaviour, ISubject
 
     private void SetTargetPos()
     {
+        
+        targetPos = Tiles[Astar.Path[movementCount].Position.x, Astar.Path[movementCount].Position.y].position +
+                   new Vector3(0, 0.5f, 0);
         if (movementCount < 1)
         {
             return; //첫 번째 이동은 타겟 위치 설정을 하지 않음
         }
-        Astar.CurrentNode = Astar.Path[movementCount - 1]; //현재 노드 업데이트
+       
         if (movementCount >= Astar.Path.Count)
         {
             return; //경로의 끝에 도달하면 타겟 위치 설정을 하지 않음
 
         }
-        targetPos = Tiles[Astar.Path[movementCount].Position.x, Astar.Path[movementCount].Position.y].position +
-                    new Vector3(0, 0.5f, 0);
-        
+        Astar.CurrentNode = Astar.Path[movementCount - 1]; //현재 노드 업데이트
+
 
     }
 

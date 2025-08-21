@@ -3,6 +3,7 @@ using UnityEngine;
 using System.Collections.Generic;
 
 using Random = UnityEngine.Random;
+using System.Linq;
 
 
 public class TileData : IComparable<TileData>
@@ -78,29 +79,27 @@ public class Tiling : MonoBehaviour
 
     private void GenerateTile(int _xCount, int _yCount)
     {
-        for(int i = 0; i < _xCount; i++)
+        var xRange = Enumerable.Range(0, _xCount);
+        var yRange = Enumerable.Range(0, _yCount);
+        var _tiles = xRange.SelectMany(x => yRange.Select(y => new Vector2Int(x, y))).ToArray(); // 타겟 타일 리스트 생성
+
+        foreach(var tile in _tiles)
         {
-            for (int j = 0; j < _yCount; j++)
+            Tiles[tile.x, tile.y] = Instantiate(Resources.Load<GameObject>("Tile")).transform;
+            Tiles[tile.x, tile.y].name = $"Tile{tile.x}_{tile.y}"; //타일 이름 설정
+            TileDataArray[tile.x, tile.y] = new TileData(); //타일 데이터 초기화
+            TileDataArray[tile.x, tile.y].Position = new Vector2Int(tile.x, tile.y); //타일 위치 설정
+            TileDataArray[tile.x, tile.y].Name = Tiles[tile.x, tile.y].name; //타일 이름 설정
+            Tiles[tile.x, tile.y].position = new Vector3(tile.x * 2 + 1, 0, tile.y * 2 + 1); //타일 위치 설정
+            Tiles[tile.x, tile.y].localScale = new Vector3(tileWidth, 1, tileHeight); //타일 크기 설정
+            Tiles[tile.x, tile.y].parent = transform; //타일 부모 설정
+            Tiles[tile.x, tile.y].gameObject.layer = 7; //타일 레이어 설정
+            //레이캐스트로 장애물 찾기
+            if (!Physics.Raycast(Tiles[tile.x, tile.y].position - new Vector3(0, 10, 0), Vector3.up, out RaycastHit hit, 100f, 1 << 6))
             {
-                Tiles[i, j] = Instantiate(Resources.Load<GameObject>("Tile")).transform;
-                Tiles[i, j].name = $"Tile{i}_{j}"; //타일 이름 설정
-                TileDataArray[i, j] = new TileData(); //타일 데이터 초기화
-                TileDataArray[i, j].Position = new Vector2Int(i, j); //타일 위치 설정
-                TileDataArray[i, j].Name = Tiles[i, j].name; //타일 이름 설정
-                TileDataArray[i, j].IsBlock = false; //타일 장애물 여부 초기화
-                Tiles[i, j].position = new Vector3(i * 2 + 1, 0, j * 2 + 1); //타일 위치 설정
-                Tiles[i, j].localScale = new Vector3(tileWidth, 1, tileHeight); //타일 크기 설정
-                Tiles[i, j].parent = transform; //타일 부모 설정
-                Tiles[i, j].gameObject.layer = 7;
-                                                                              //레이캐스트로 장애물 찾기
-
-                if (Physics.Raycast(Tiles[i, j].position - new Vector3(0,10,0) , Vector3.up, out RaycastHit hit, 100f,1 << 6))
-                {
-                    TileDataArray[i, j].IsBlock = true; //장애물 타일 설정
-
-                }
-                 //이동 불가능한 타일 리스트에 추가
+                continue; //장애물이 없으면 다음 타일로
             }
+            TileDataArray[tile.x, tile.y].IsBlock = true; //장애물 타일 설정
         }
         GenerateCharacters();
     }
@@ -122,12 +121,15 @@ public class Tiling : MonoBehaviour
         _runner.GetComponent<RunnerController>().Astar.TileDataList = TileDataArray; //타일 데이터 배열 설정
         _runner.GetComponent<RunnerController>().Astar.StartPos = new Vector2Int(runnerStartPoint[Random.Range(0, runnerStartPoint.Length)].x, runnerStartPoint[Random.Range(0, runnerStartPoint.Length)].y); //도망자 시작 위치 설정
         _runner.transform.position = Tiles[_runner.GetComponent<RunnerController>().Astar.StartPos.x, _runner.GetComponent<CharacterController>().Astar.StartPos.y].position + new Vector3(0, 0.5f, 0); //도망자 위치 설정
-        _runner.GetComponent<RunnerController>().Init(_chaser.GetComponent<ChaserController>(), gameManager.fow.viewAngle); //목표 위치 설정
-        _chaser.GetComponent<ChaserController>().Init(_runner.GetComponent<RunnerController>()); //목표 위치 설정
         gameManager.fow.Characters[0] = _chaser.GetComponent<CharacterController>();
         gameManager.fow.Characters[1] = _runner.GetComponent<CharacterController>();
         gameManager.RegisterObserver(_chaser.GetComponent<ChaserController>()); //추적자에 옵저버 등록
         gameManager.RegisterObserver(_runner.GetComponent<RunnerController>()); //도망자에 옵저버 등록
+        _runner.GetComponent<RunnerController>().Init(_chaser.GetComponent<ChaserController>(), gameManager.fow.viewAngle); //목표 위치 설정
+
+        _chaser.GetComponent<ChaserController>().Init(_runner.GetComponent<RunnerController>()); //목표 위치 설정
+        
+        
         
         
     }

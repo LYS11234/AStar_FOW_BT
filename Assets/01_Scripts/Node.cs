@@ -97,7 +97,6 @@ public class Selector : Node
 
         public override NodeState Evaluate()
         {
-            self.HasLineOfSight(); // 플레이어가 시야에 있는지 확인하는 메서드 호출
             if (!self.GetInSight())
             {
                 return NodeState.Failure; // 시야 내에 플레이어가 없으면 실패 반환
