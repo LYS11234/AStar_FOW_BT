@@ -289,7 +289,6 @@ public class CharacterController : MonoBehaviour, ISubject
         transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, 360f * Time.deltaTime);
     }
 
-    // ✨ 기존 Turn() 메소드는 내부 로직을 수정
     protected void Turn()
     {
         // 순찰 시에는 스스로 목적지를 설정하고
